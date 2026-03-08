@@ -5,6 +5,7 @@ __pycache__/
 dist/
 build/
 .DS_Store
+.envrc
 .claude/
 .coverage
 htmlcov/
