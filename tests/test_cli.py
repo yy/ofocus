@@ -1,8 +1,19 @@
 """Unit tests for CLI helpers — no OmniFocus needed."""
 
-import pytest
+import subprocess
 
-from ofocus.cli import _js_escape, _validate_date, _validate_task_id
+import pytest
+from click.testing import CliRunner
+
+from ofocus.cli import (
+    JS_TASKS,
+    _js_escape,
+    _run_jxa,
+    _validate_date,
+    _validate_task_id,
+    cli,
+)
+from ofocus.omni import OmniError
 
 
 def test_js_escape_basic():
@@ -80,6 +91,11 @@ def test_validate_date_rejects_garbage():
         _validate_date("not-a-date")
 
 
+def test_validate_date_rejects_impossible_date():
+    with pytest.raises(SystemExit):
+        _validate_date("2026-02-31")
+
+
 # ── _validate_task_id ───────────────────────────────────────────────────
 
 
@@ -104,3 +120,41 @@ def test_validate_task_id_rejects_spaces():
 def test_validate_task_id_rejects_injection():
     with pytest.raises(SystemExit):
         _validate_task_id('"}); doShellScript("evil")')
+
+
+def test_js_tasks_excludes_dropped():
+    assert "!t.dropped()" in JS_TASKS
+
+
+def test_stats_excludes_dropped_from_active_and_overdue(monkeypatch):
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        return {
+            "inbox": 0,
+            "active": 0,
+            "projects": 0,
+            "tags": 0,
+            "flagged": 0,
+            "overdue": 0,
+        }
+
+    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["stats", "--json"])
+
+    assert result.exit_code == 0
+    assert len(scripts) == 1
+    assert "!t.dropped()" in scripts[0]
+    assert "t.completed() || t.dropped()" in scripts[0]
+
+
+def test_run_jxa_timeout_raises_omnierror(monkeypatch):
+    def fake_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=args[0], timeout=kwargs.get("timeout", 0))
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    with pytest.raises(OmniError, match="timed out"):
+        _run_jxa("JSON.stringify({ok: true});")

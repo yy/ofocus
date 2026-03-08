@@ -2,13 +2,16 @@
 
 import json
 import subprocess
+from typing import Any
+
+OMNIJS_TIMEOUT_SECONDS = 15
 
 
 class OmniError(Exception):
     """Error from OmniAutomation execution."""
 
 
-def run_omnijs(script: str) -> any:
+def run_omnijs(script: str) -> Any:
     """Run OmniAutomation JS inside OmniFocus, return parsed JSON.
 
     The script should end with a JSON.stringify(...) expression.
@@ -22,7 +25,13 @@ def run_omnijs(script: str) -> any:
             capture_output=True,
             text=True,
             check=True,
+            timeout=OMNIJS_TIMEOUT_SECONDS,
         )
+    except subprocess.TimeoutExpired as e:
+        raise OmniError(
+            "OmniAutomation error: command timed out after "
+            f"{OMNIJS_TIMEOUT_SECONDS} seconds"
+        ) from e
     except subprocess.CalledProcessError as e:
         raise OmniError(
             f"OmniAutomation error: {e.stderr.strip() or e.stdout.strip()}"

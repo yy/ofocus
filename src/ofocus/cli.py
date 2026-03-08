@@ -4,6 +4,8 @@ import json
 import re
 import subprocess
 import sys
+from datetime import date
+from typing import Any
 
 import click
 
@@ -33,7 +35,7 @@ JSON.stringify(tasks);
 JS_TASKS = """\
 var doc = Application("OmniFocus").defaultDocument;
 var tasks = doc.flattenedTasks().filter(function(t) {
-    return !t.completed();
+    return !t.completed() && !t.dropped();
 }).map(function(t) {
     var tags = t.tags().map(function(tg) { return tg.name(); });
     var proj = t.containingProject();
@@ -186,6 +188,7 @@ def tasks(project, tag, flagged, due_before, as_json):
     if flagged:
         task_list = [t for t in task_list if t.flagged]
     if due_before:
+        due_before = _validate_date(due_before)
         task_list = [
             t for t in task_list if t.due_date and t.due_date[:10] <= due_before
         ]
@@ -486,16 +489,27 @@ def stats(as_json):
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
 var inbox = doc.inboxTasks().length;
-var active = doc.flattenedTasks().filter(function(t) { return !t.completed(); }).length;
+var active = doc.flattenedTasks().filter(function(t) {
+    return !t.completed() && !t.dropped();
+}).length;
 var projects = doc.flattenedProjects().length;
 var tags = doc.flattenedTags().length;
-var flagged = doc.flattenedTasks().filter(function(t) { return t.flagged() && !t.completed(); }).length;
+var flagged = doc.flattenedTasks().filter(function(t) {
+    return t.flagged() && !t.completed() && !t.dropped();
+}).length;
 var overdue = doc.flattenedTasks().filter(function(t) {
-    if (t.completed()) return false;
+    if (t.completed() || t.dropped()) return false;
     var d = t.dueDate();
     return d && d < new Date();
 }).length;
-JSON.stringify({inbox: inbox, active: active, projects: projects, tags: tags, flagged: flagged, overdue: overdue});
+JSON.stringify({
+    inbox: inbox,
+    active: active,
+    projects: projects,
+    tags: tags,
+    flagged: flagged,
+    overdue: overdue
+});
 """
     try:
         result = _run_jxa(script)
@@ -540,12 +554,18 @@ def dump():
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TASK_ID_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
+JXA_TIMEOUT_SECONDS = 15
 
 
 def _validate_date(value: str) -> str:
     """Validate and return a YYYY-MM-DD date string."""
     if not _DATE_RE.match(value):
         click.echo("Error: date must be YYYY-MM-DD format", err=True)
+        sys.exit(1)
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        click.echo("Error: date must be a real calendar date", err=True)
         sys.exit(1)
     return value
 
@@ -574,7 +594,7 @@ def _js_escape(s: str) -> str:
     )
 
 
-def _run_jxa(script: str) -> dict | None:
+def _run_jxa(script: str) -> Any | None:
     """Run a JXA (not OmniAutomation) script and parse JSON result."""
     try:
         result = subprocess.run(
@@ -582,7 +602,12 @@ def _run_jxa(script: str) -> dict | None:
             capture_output=True,
             text=True,
             check=True,
+            timeout=JXA_TIMEOUT_SECONDS,
         )
+    except subprocess.TimeoutExpired as e:
+        raise OmniError(
+            f"JXA error: command timed out after {JXA_TIMEOUT_SECONDS} seconds"
+        ) from e
     except subprocess.CalledProcessError as e:
         raise OmniError(f"JXA error: {e.stderr.strip() or e.stdout.strip()}") from e
 

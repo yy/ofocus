@@ -1,6 +1,6 @@
 # ofocus
 
-A command-line interface for [OmniFocus](https://www.omnigroup.com/omnifocus) on macOS. Read and write tasks, projects, and tags directly from your terminal.
+A command-line interface for [OmniFocus](https://www.omnigroup.com/omnifocus) on macOS. Read and write tasks, projects, and tags directly from your terminal — or let AI agents (Claude Code, MCP servers, etc.) work with OmniFocus.
 
 ofocus talks to OmniFocus through JXA (JavaScript for Automation) via `osascript` — no plugins, no server, no API keys. If OmniFocus is running, ofocus works.
 
