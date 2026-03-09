@@ -550,6 +550,18 @@ def dump():
     click.echo(json.dumps(result, indent=2))
 
 
+# ── Usage ────────────────────────────────────────────────────────────────
+
+
+@cli.command()
+def usage():
+    """Print CLI reference for humans and AI agents."""
+    from importlib.resources import files
+
+    text = files("ofocus").joinpath("USAGE.md").read_text()
+    click.echo(text)
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
