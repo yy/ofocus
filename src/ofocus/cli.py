@@ -15,7 +15,19 @@ from ofocus.omni import OmniError
 # ── JS snippets ──────────────────────────────────────────────────────────
 
 
+JS_LOCAL_DATE_HELPERS = """\
+function toLocalDateString(d) {
+    if (!d) return null;
+    var year = d.getFullYear();
+    var month = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
+}
+"""
+
+
 JS_INBOX = """\
+""" + JS_LOCAL_DATE_HELPERS + """\
 var doc = Application("OmniFocus").defaultDocument;
 var tasks = doc.inboxTasks().map(function(t) {
     var tags = t.tags().map(function(tg) { return tg.name(); });
@@ -24,7 +36,7 @@ var tasks = doc.inboxTasks().map(function(t) {
         name: t.name(),
         flagged: t.flagged(),
         completed: t.completed(),
-        dueDate: t.dueDate() ? t.dueDate().toISOString() : null,
+        dueDate: toLocalDateString(t.dueDate()),
         note: t.note(),
         tags: tags
     };
@@ -33,6 +45,7 @@ JSON.stringify(tasks);
 """
 
 JS_TASKS = """\
+""" + JS_LOCAL_DATE_HELPERS + """\
 var doc = Application("OmniFocus").defaultDocument;
 var tasks = doc.flattenedTasks().filter(function(t) {
     return !t.completed() && !t.dropped();
@@ -44,7 +57,7 @@ var tasks = doc.flattenedTasks().filter(function(t) {
         name: t.name(),
         flagged: t.flagged(),
         completed: false,
-        dueDate: t.dueDate() ? t.dueDate().toISOString() : null,
+        dueDate: toLocalDateString(t.dueDate()),
         note: t.note(),
         project: proj ? proj.name() : null,
         tags: tags
@@ -148,7 +161,7 @@ doc.inboxTasks.push(task);
     if flag:
         script += "task.flagged = true;\n"
     if due:
-        script += f'task.dueDate = new Date("{_validate_date(due)}");\n'
+        script += f"task.dueDate = {_jxa_local_date_constructor(due)};\n"
     script += "JSON.stringify({id: task.id(), name: task.name()});"
 
     try:
@@ -251,7 +264,7 @@ def update(task_id, name, due, flag, note, as_json):
     if name is not None:
         updates.append(f'task.name = "{_js_escape(name)}";')
     if due is not None:
-        updates.append(f'task.dueDate = new Date("{_validate_date(due)}");')
+        updates.append(f"task.dueDate = {_jxa_local_date_constructor(due)};")
     if flag is not None:
         updates.append(f"task.flagged = {'true' if flag else 'false'};")
     if note is not None:
@@ -604,6 +617,12 @@ def _js_escape(s: str) -> str:
         .replace("\u2028", "\\u2028")
         .replace("\u2029", "\\u2029")
     )
+
+
+def _jxa_local_date_constructor(value: str) -> str:
+    """Return a JXA Date constructor that preserves the local calendar date."""
+    parsed = date.fromisoformat(_validate_date(value))
+    return f"new Date({parsed.year}, {parsed.month - 1}, {parsed.day})"
 
 
 def _run_jxa(script: str) -> Any | None:

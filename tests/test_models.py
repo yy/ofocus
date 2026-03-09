@@ -18,20 +18,20 @@ def test_task_from_dict_full():
             "name": "Review PR",
             "flagged": True,
             "completed": False,
-            "dueDate": "2026-03-15T00:00:00.000Z",
+            "dueDate": "2026-03-15",
             "note": "Check tests",
             "project": "Work",
             "tags": ["code", "urgent"],
         }
     )
     assert t.flagged is True
-    assert t.due_date == "2026-03-15T00:00:00.000Z"
+    assert t.due_date == "2026-03-15"
     assert t.project == "Work"
     assert t.tags == ["code", "urgent"]
 
 
 def test_task_to_line():
-    t = Task(id="abc", name="Buy milk", flagged=True, due_date="2026-03-15T00:00:00Z")
+    t = Task(id="abc", name="Buy milk", flagged=True, due_date="2026-03-15")
     line = t.to_line()
     assert "* Buy milk" in line
     assert "(due 2026-03-15)" in line
