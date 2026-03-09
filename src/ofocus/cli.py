@@ -101,7 +101,7 @@ def _handle_error(e: OmniError):
 
 
 @click.group()
-@click.version_option(version="0.1.0", prog_name="ofocus")
+@click.version_option(version="0.1.1", prog_name="ofocus")
 def cli():
     """OmniFocus CLI via OmniAutomation."""
 
