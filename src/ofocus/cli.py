@@ -26,10 +26,15 @@ function toLocalDateString(d) {
 """
 
 
-JS_INBOX = """\
-""" + JS_LOCAL_DATE_HELPERS + """\
+JS_INBOX = (
+    """\
+"""
+    + JS_LOCAL_DATE_HELPERS
+    + """\
 var doc = Application("OmniFocus").defaultDocument;
-var tasks = doc.inboxTasks().map(function(t) {
+var tasks = doc.inboxTasks().filter(function(t) {
+    return !t.completed() && !t.dropped();
+}).map(function(t) {
     var tags = t.tags().map(function(tg) { return tg.name(); });
     return {
         id: t.id(),
@@ -43,9 +48,13 @@ var tasks = doc.inboxTasks().map(function(t) {
 });
 JSON.stringify(tasks);
 """
+)
 
-JS_TASKS = """\
-""" + JS_LOCAL_DATE_HELPERS + """\
+JS_TASKS = (
+    """\
+"""
+    + JS_LOCAL_DATE_HELPERS
+    + """\
 var doc = Application("OmniFocus").defaultDocument;
 var tasks = doc.flattenedTasks().filter(function(t) {
     return !t.completed() && !t.dropped();
@@ -65,6 +74,7 @@ var tasks = doc.flattenedTasks().filter(function(t) {
 });
 JSON.stringify(tasks);
 """
+)
 
 JS_PROJECTS = """\
 var doc = Application("OmniFocus").defaultDocument;
@@ -579,7 +589,7 @@ def usage():
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TASK_ID_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
-JXA_TIMEOUT_SECONDS = 15
+JXA_TIMEOUT_SECONDS = 30
 
 
 def _validate_date(value: str) -> str:
