@@ -240,7 +240,7 @@ if (matches.length === 0) {{
     JSON.stringify({{error: "Task not found"}});
 }} else {{
     var task = matches[0];
-    task.completed = true;
+    app.markComplete(task);
     JSON.stringify({{id: task.id(), name: task.name(), completed: true}});
 }}
 """
@@ -325,7 +325,7 @@ if (matches.length === 0) {{
     JSON.stringify({{error: "Task not found"}});
 }} else {{
     var task = matches[0];
-    task.dropped = true;
+    app.markDropped(task);
     JSON.stringify({{id: task.id(), name: task.name(), dropped: true}});
 }}
 """

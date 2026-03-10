@@ -26,8 +26,8 @@ Key JXA patterns:
 - `doc.flattenedTasks.whose({id: "..."})()` → find by ID
 - `app.InboxTask({name: "..."})` → create inbox task
 - `app.Project({name: "..."})` → create project
-- `task.completed = true` → complete a task (JXA property assignment)
-- `task.dropped = true` → drop a task
+- `app.markComplete(task)` → complete a task (NOT `task.completed = true`, which throws access error)
+- `app.markDropped(task)` → drop a task (NOT `task.dropped = true`)
 
 ### `omni.py` — OmniAutomation bridge (currently unused)
 
@@ -84,6 +84,5 @@ OmniFocus task IDs are opaque strings like `j7cpqVlu`. The CLI shows the first 8
 
 - `ofocus clean` — deduplicate, flag stale
 - Batch operations
-- Publish to PyPI
 - Template support
 - Perspectives, forecast, focus
