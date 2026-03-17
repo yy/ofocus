@@ -51,7 +51,7 @@ Click-based CLI. All commands support `--json` for machine-readable output.
 - `ofocus inbox add "name" [--note --due --flag]` — add to inbox
 - `ofocus tasks [--project --tag --flagged --due-before]` — list active tasks
 - `ofocus complete <id>` — mark complete
-- `ofocus update <id> [--name --due --flag/--no-flag --note]` — update task
+- `ofocus update <id> [--name --due --flag/--no-flag --note --project]` — update task (--project takes a project ID to move the task)
 - `ofocus drop <id>` — drop task
 - `ofocus delete <id>` — permanently delete
 - `ofocus projects [--folder]` — list projects

@@ -34,6 +34,7 @@ ofocus update <id> --name "New name"                 # Rename
 ofocus update <id> --due 2026-03-20 --flag           # Set due date and flag
 ofocus update <id> --no-flag                         # Remove flag
 ofocus update <id> --note "Updated note"             # Set note
+ofocus update <id> --project <project_id>            # Move to project
 ofocus drop <id>                                     # Drop (soft delete)
 ofocus delete <id>                                   # Permanent delete
 ```

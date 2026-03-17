@@ -266,8 +266,9 @@ if (matches.length === 0) {{
 @click.option("--due", default=None, help="New due date (YYYY-MM-DD)")
 @click.option("--flag/--no-flag", default=None, help="Set/unset flag")
 @click.option("--note", default=None, help="Set note")
+@click.option("--project", default=None, help="Move to project (by project ID)")
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
-def update(task_id, name, due, flag, note, as_json):
+def update(task_id, name, due, flag, note, project, as_json):
     """Update a task."""
     _validate_task_id(task_id)
     updates = []
@@ -279,10 +280,16 @@ def update(task_id, name, due, flag, note, as_json):
         updates.append(f"task.flagged = {'true' if flag else 'false'};")
     if note is not None:
         updates.append(f'task.note = "{_js_escape(note)}";')
+    if project is not None:
+        _validate_task_id(project)  # same safe-char validation
+        updates.append(f"""\
+var projMatches = doc.flattenedProjects.whose({{id: "{_js_escape(project)}"}})();
+if (projMatches.length === 0) {{ throw new Error("Project not found"); }}
+projMatches[0].tasks.push(task);""")
     if not updates:
         click.echo("No updates specified.", err=True)
         sys.exit(1)
-    update_code = "\n".join(updates)
+    update_code = "\n    ".join(updates)
     script = f"""\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
@@ -292,7 +299,8 @@ if (matches.length === 0) {{
 }} else {{
     var task = matches[0];
     {update_code}
-    JSON.stringify({{id: task.id(), name: task.name(), flagged: task.flagged()}});
+    var proj = task.containingProject();
+    JSON.stringify({{id: task.id(), name: task.name(), flagged: task.flagged(), project: proj ? proj.name() : null}});
 }}
 """
     try:
