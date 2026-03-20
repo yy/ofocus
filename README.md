@@ -10,7 +10,7 @@ Requires Python 3.13+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 # From source
-git clone https://github.com/yourusername/ofocus.git
+git clone https://github.com/yy/ofocus.git
 cd ofocus
 uv sync
 
@@ -31,24 +31,27 @@ ofocus inbox
 ofocus inbox add "Buy coffee beans" --flag
 ofocus inbox add "Read paper" --due 2026-03-15 --note "The one from Alice"
 
+# Browse projects and folders
+ofocus project ls
+ofocus project ls "Research"
+ofocus project show "Paper writing"
+ofocus project show "Paper writing" --first    # First available task
+
 # Find tasks across inbox and projects
-ofocus search "quarterly"
+ofocus task search "quarterly"
 
 # List active tasks, optionally filtered
-ofocus tasks
-ofocus tasks --project "Work" --flagged
-ofocus tasks --tag "errand" --due-before 2026-03-10
+ofocus task ls
+ofocus task ls --project "Work" --flagged
+ofocus task ls --tag "errand" --due-before 2026-03-10
 
 # Mark done, update, or drop
-ofocus complete j7cpqVlu
-ofocus update j7cpqVlu --name "Buy good coffee beans" --flag
-ofocus drop j7cpqVlu
+ofocus task complete j7cpqVlu
+ofocus task update j7cpqVlu --name "Buy good coffee beans" --flag
+ofocus task drop j7cpqVlu
 
-# Projects and tags
-ofocus projects
-ofocus projects --folder "Work"
-ofocus project-create "Q2 Planning" --folder "Work"
-ofocus tags
+# Create a project
+ofocus project create "Q2 Planning" --folder "Work"
 ```
 
 ## Commands
@@ -57,27 +60,28 @@ ofocus tags
 |---|---|
 | `ofocus inbox` | List inbox tasks |
 | `ofocus inbox add "name"` | Add task to inbox (`--note`, `--due`, `--flag`) |
-| `ofocus tasks` | List active tasks (`--project`, `--tag`, `--flagged`, `--due-before`) |
-| `ofocus search "query"` | Search by name/note across inbox and active tasks |
-| `ofocus complete <id>` | Mark a task complete |
-| `ofocus update <id>` | Update a task (`--name`, `--due`, `--flag`/`--no-flag`, `--note`) |
-| `ofocus drop <id>` | Drop a task |
-| `ofocus delete <id>` | Permanently delete a task |
-| `ofocus projects` | List projects (`--folder`) |
-| `ofocus project-create "name"` | Create a project (`--folder`) |
-| `ofocus tags` | List all tags |
+| `ofocus task ls` | List active tasks (`--project`, `--tag`, `--flagged`, `--due-before`) |
+| `ofocus task search "query"` | Search by name/note across inbox and active tasks |
+| `ofocus task complete <id>` | Mark a task complete |
+| `ofocus task update <id>` | Update a task (`--name`, `--due`, `--flag`/`--no-flag`, `--note`, `--project`) |
+| `ofocus task drop <id>` | Drop a task |
+| `ofocus task delete <id>` | Permanently delete a task |
+| `ofocus project ls [folder]` | Browse folders and projects (drill into subfolders) |
+| `ofocus project show <project>` | Show project tasks as a tree (`--available`, `--first`, `--all`) |
+| `ofocus project create "name"` | Create a project (`--folder`) |
+| `ofocus tag ls` | List all tags |
 | `ofocus stats` | Quick counts (inbox, active, flagged, overdue) |
 | `ofocus dump` | Full JSON dump of everything |
 
-Every command supports `--json` for machine-readable output.
+Most data commands support `--json` for machine-readable output. Bare `ofocus task` and `ofocus project` default to their `ls` subcommand.
 
 ## JSON mode
 
-All commands accept `--json` to output structured JSON instead of human-readable text. This makes ofocus composable with other tools:
+Commands that return task/project/tag/stat data accept `--json` to output structured JSON instead of human-readable text. This makes ofocus composable with other tools:
 
 ```bash
 # Pipe flagged tasks to jq
-ofocus tasks --flagged --json | jq '.[].name'
+ofocus task ls --flagged --json | jq '.[].name'
 
 # Get task IDs for scripting
 ofocus inbox --json | jq -r '.[].id'
@@ -88,14 +92,13 @@ ofocus dump > omnifocus-backup.json
 
 ## Task IDs
 
-Human output shows truncated 8-character IDs for readability. Use `--json` to get full IDs for `complete`, `update`, `drop`, and `delete` commands:
+Human output shows truncated 8-character IDs for readability. These work as prefixes in task/project commands:
 
 ```bash
-$ ofocus inbox --json | jq -r '.[] | "\(.id) \(.name)"'
-j7cpqVlu3kR  Buy coffee beans
-a9xmPn2Qw4Y  Read paper
+$ ofocus inbox
+  j7cpqVlu  Buy coffee beans
 
-$ ofocus complete j7cpqVlu3kR
+$ ofocus task complete j7cpqVlu
 Completed: Buy coffee beans
 ```
 
@@ -105,7 +108,10 @@ The `--json` flag on every command makes ofocus a natural tool for Claude Code, 
 
 ```bash
 # An agent can check what's overdue
-ofocus tasks --due-before 2026-03-08 --json
+ofocus task ls --due-before 2026-03-08 --json
+
+# Browse project structure
+ofocus project show "Paper writing" --first --json
 
 # Add a task from an agent workflow
 ofocus inbox add "Follow up on PR review" --due 2026-03-10 --json

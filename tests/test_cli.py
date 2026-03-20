@@ -1,4 +1,4 @@
-"""Unit tests for CLI helpers — no OmniFocus needed."""
+"""Unit tests for CLI — no OmniFocus needed."""
 
 import subprocess
 
@@ -6,135 +6,136 @@ import pytest
 from click.testing import CliRunner
 
 from ofocus import __version__
-from ofocus.cli import (  # noqa: F811
-    JS_INBOX,
-    JS_TASKS,
-    _annotate_types,
-    _collect_first_available,  # noqa: F401
-    _count_tasks,
-    _filter_available,  # noqa: F401
-    _filter_tree,
-    _format_task_line,
-    _js_escape,
-    _jxa_local_date_constructor,
-    _mark_availability,  # noqa: F401
-    _print_tree,
-    _run_jxa,
-    _validate_date,
-    _validate_task_id,
-    cli,
+from ofocus.cli import cli
+from ofocus.helpers import (
+    annotate_types,
+    collect_first_available,
+    count_tasks,
+    filter_available,
+    filter_tree,
+    format_task_line,
+    js_escape,
+    jxa_local_date_constructor,
+    mark_availability,
+    print_tree,
+    validate_date,
+    validate_task_id,
 )
+from ofocus.jxa import JS_INBOX, JS_TASKS, run_jxa
 from ofocus.omni import OmniError
+
+# Patch target for jxa.run_jxa as used by each command module
+_PATCH_JXA = "ofocus.jxa.run_jxa"
 
 
 def test_js_escape_basic():
-    assert _js_escape("hello") == "hello"
+    assert js_escape("hello") == "hello"
 
 
 def test_js_escape_double_quotes():
-    assert _js_escape('say "hi"') == 'say \\"hi\\"'
+    assert js_escape('say "hi"') == 'say \\"hi\\"'
 
 
 def test_js_escape_single_quotes():
-    assert _js_escape("it's") == "it\\'s"
+    assert js_escape("it's") == "it\\'s"
 
 
 def test_js_escape_backslash():
-    assert _js_escape("a\\b") == "a\\\\b"
+    assert js_escape("a\\b") == "a\\\\b"
 
 
 def test_js_escape_newline():
-    assert _js_escape("line1\nline2") == "line1\\nline2"
+    assert js_escape("line1\nline2") == "line1\\nline2"
 
 
 def test_js_escape_backtick():
-    assert _js_escape("use `code`") == "use \\`code\\`"
+    assert js_escape("use `code`") == "use \\`code\\`"
 
 
 def test_js_escape_dollar():
-    assert _js_escape("cost $5") == "cost \\$5"
+    assert js_escape("cost $5") == "cost \\$5"
 
 
 def test_js_escape_template_literal_injection():
-    assert _js_escape("${alert(1)}") == "\\${alert(1)}"
+    assert js_escape("${alert(1)}") == "\\${alert(1)}"
 
 
 def test_js_escape_carriage_return():
-    assert _js_escape("a\rb") == "a\\rb"
+    assert js_escape("a\rb") == "a\\rb"
 
 
 def test_js_escape_null_byte():
-    assert _js_escape("a\0b") == "a\\0b"
+    assert js_escape("a\0b") == "a\\0b"
 
 
 def test_js_escape_line_separator():
-    assert _js_escape("a\u2028b") == "a\\u2028b"
+    assert js_escape("a\u2028b") == "a\\u2028b"
 
 
 def test_js_escape_paragraph_separator():
-    assert _js_escape("a\u2029b") == "a\\u2029b"
+    assert js_escape("a\u2029b") == "a\\u2029b"
 
 
 def test_js_escape_combined():
-    result = _js_escape("a\\b\"c'd`e$f\ng")
+    result = js_escape("a\\b\"c'd`e$f\ng")
     assert result == "a\\\\b\\\"c\\'d\\`e\\$f\\ng"
 
 
-# ── _validate_date ──────────────────────────────────────────────────────
+# ── validate_date ──────────────────────────────────────────────────────
 
 
 def test_validate_date_valid():
-    assert _validate_date("2026-03-08") == "2026-03-08"
+    assert validate_date("2026-03-08") == "2026-03-08"
 
 
 def test_validate_date_rejects_injection():
     with pytest.raises(SystemExit):
-        _validate_date('"); doShellScript("evil"); //')
+        validate_date('"); doShellScript("evil"); //')
 
 
 def test_validate_date_rejects_partial():
     with pytest.raises(SystemExit):
-        _validate_date("2026-3-8")
+        validate_date("2026-3-8")
 
 
 def test_validate_date_rejects_garbage():
     with pytest.raises(SystemExit):
-        _validate_date("not-a-date")
+        validate_date("not-a-date")
 
 
 def test_validate_date_rejects_impossible_date():
     with pytest.raises(SystemExit):
-        _validate_date("2026-02-31")
+        validate_date("2026-02-31")
 
 
 def test_jxa_local_date_constructor_uses_local_components():
-    assert _jxa_local_date_constructor("2026-03-15") == "new Date(2026, 2, 15)"
+    assert jxa_local_date_constructor("2026-03-15") == "new Date(2026, 2, 15)"
 
 
-# ── _validate_task_id ───────────────────────────────────────────────────
+# ── validate_task_id ───────────────────────────────────────────────────
 
 
 def test_validate_task_id_valid():
-    assert _validate_task_id("j7cpqVlu") == "j7cpqVlu"
+    assert validate_task_id("j7cpqVlu") == "j7cpqVlu"
 
 
 def test_validate_task_id_with_hyphens():
-    assert _validate_task_id("abc-123_XY") == "abc-123_XY"
+    assert validate_task_id("abc-123_XY") == "abc-123_XY"
 
 
 def test_validate_task_id_rejects_quotes():
     with pytest.raises(SystemExit):
-        _validate_task_id('abc"def')
+        validate_task_id('abc"def')
 
 
 def test_validate_task_id_rejects_spaces():
     with pytest.raises(SystemExit):
-        _validate_task_id("abc def")
+        validate_task_id("abc def")
 
 
 def test_validate_task_id_rejects_injection():
     with pytest.raises(SystemExit):
-        _validate_task_id('"}); doShellScript("evil")')
+        validate_task_id('"}); doShellScript("evil")')
 
 
 def test_cli_version_matches_package_version():
@@ -169,7 +170,7 @@ def test_stats_excludes_dropped_from_active_and_overdue(monkeypatch):
             "overdue": 0,
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
     result = runner.invoke(cli, ["stats", "--json"])
 
@@ -186,7 +187,84 @@ def test_run_jxa_timeout_raises_omnierror(monkeypatch):
     monkeypatch.setattr("subprocess.run", fake_run)
 
     with pytest.raises(OmniError, match="timed out"):
-        _run_jxa("JSON.stringify({ok: true});")
+        run_jxa("JSON.stringify({ok: true});")
+
+
+def test_run_jxa_empty_output_raises_omnierror(monkeypatch):
+    class Result:
+        stdout = ""
+
+    def fake_run(*_args, **_kwargs):
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    with pytest.raises(OmniError, match="empty output"):
+        run_jxa("JSON.stringify({ok: true});")
+
+
+@pytest.mark.parametrize(
+    ("argv", "fake_result"),
+    [
+        (
+            ["task", "complete", "abc12345"],
+            {"id": "abc12345XYZ", "name": "Read paper", "completed": True},
+        ),
+        (
+            ["task", "update", "abc12345", "--name", "Renamed"],
+            {"id": "abc12345XYZ", "name": "Renamed", "flagged": False, "project": None},
+        ),
+        (
+            ["task", "drop", "abc12345"],
+            {"id": "abc12345XYZ", "name": "Read paper", "dropped": True},
+        ),
+        (
+            ["task", "delete", "abc12345"],
+            {"id": "abc12345XYZ", "name": "Read paper", "deleted": True},
+        ),
+    ],
+)
+def test_task_mutation_commands_support_prefix_lookup(monkeypatch, argv, fake_result):
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        return fake_result
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, argv)
+
+    assert result.exit_code == 0
+    assert len(scripts) == 1
+    assert "indexOf(query) === 0" in scripts[0]
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["task", "complete", "abc12345"],
+        ["task", "update", "abc12345", "--name", "X"],
+        ["task", "drop", "abc12345"],
+        ["task", "delete", "abc12345"],
+    ],
+)
+def test_task_mutation_commands_fail_cleanly_on_ambiguous_prefix(monkeypatch, argv):
+    def fake_run_jxa(_script):
+        return {
+            "error": "ambiguous",
+            "matches": [
+                {"id": "abc12345XYZ", "name": "Task A"},
+                {"id": "abc12345ZZZ", "name": "Task B"},
+            ],
+        }
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, argv)
+
+    assert result.exit_code == 1
+    assert "Multiple tasks match" in result.output
 
 
 def test_inbox_add_due_uses_local_date_constructor(monkeypatch):
@@ -196,7 +274,7 @@ def test_inbox_add_due_uses_local_date_constructor(monkeypatch):
         scripts.append(script)
         return {"id": "abc12345", "name": "Read paper"}
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
     result = runner.invoke(cli, ["inbox", "add", "Read paper", "--due", "2026-03-15"])
 
@@ -213,9 +291,9 @@ def test_update_due_uses_local_date_constructor(monkeypatch):
         scripts.append(script)
         return {"id": "abc12345", "name": "Read paper", "flagged": False}
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["update", "abc12345", "--due", "2026-03-15"])
+    result = runner.invoke(cli, ["task", "update", "abc12345", "--due", "2026-03-15"])
 
     assert result.exit_code == 0
     assert len(scripts) == 1
@@ -230,9 +308,9 @@ def test_tasks_due_before_uses_local_dates_in_json(monkeypatch):
             {"id": "a2", "name": "Tomorrow", "dueDate": "2026-03-11"},
         ]
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["tasks", "--due-before", "2026-03-10", "--json"])
+    result = runner.invoke(cli, ["task", "ls", "--due-before", "2026-03-10", "--json"])
 
     assert result.exit_code == 0
     assert result.output.strip() == (
@@ -314,10 +392,9 @@ SAMPLE_TREE = [
 
 
 def test_filter_tree_removes_completed_and_dropped():
-    filtered = _filter_tree(SAMPLE_TREE)
+    filtered = filter_tree(SAMPLE_TREE)
     names = [n["name"] for n in filtered]
     assert "Dropped task" not in names
-    # Phase 1 group kept, but completed child removed
     phase1 = [n for n in filtered if n["name"] == "Phase 1"][0]
     child_names = [c["name"] for c in phase1["children"]]
     assert "Draft outline" in child_names
@@ -328,19 +405,18 @@ def test_filter_tree_preserves_all_when_nothing_completed():
     tree = [
         {"id": "a", "name": "A", "completed": False, "dropped": False, "children": []},
     ]
-    assert len(_filter_tree(tree)) == 1
+    assert len(filter_tree(tree)) == 1
 
 
 def test_count_tasks_leaf_only():
-    remaining, total = _count_tasks(SAMPLE_TREE, count_all=True)
-    # Leaf tasks: t1 (remaining), t2 (remaining), t3 (completed), t4 (dropped)
+    remaining, total = count_tasks(SAMPLE_TREE, count_all=True)
     assert total == 4
     assert remaining == 2
 
 
 def test_count_tasks_after_filter():
-    filtered = _filter_tree(SAMPLE_TREE)
-    remaining, total = _count_tasks(filtered, count_all=True)
+    filtered = filter_tree(SAMPLE_TREE)
+    remaining, total = count_tasks(filtered, count_all=True)
     assert total == 2
     assert remaining == 2
 
@@ -350,7 +426,7 @@ def test_annotate_types():
         {"name": "leaf", "children": []},
         {"name": "group", "children": [{"name": "child", "children": []}]},
     ]
-    _annotate_types(tree)
+    annotate_types(tree)
     assert tree[0]["type"] == "task"
     assert tree[1]["type"] == "group"
     assert tree[1]["children"][0]["type"] == "task"
@@ -365,7 +441,7 @@ def test_format_task_line_plain():
         "dueDate": None,
         "tags": [],
     }
-    assert _format_task_line(node) == "Do thing"
+    assert format_task_line(node) == "Do thing"
 
 
 def test_format_task_line_all_decorators():
@@ -377,7 +453,7 @@ def test_format_task_line_all_decorators():
         "dueDate": "2026-04-01",
         "tags": ["work", "urgent"],
     }
-    line = _format_task_line(node)
+    line = format_task_line(node)
     assert "Important" in line
     assert "⚑" in line
     assert "(due 2026-04-01)" in line
@@ -394,7 +470,7 @@ def test_format_task_line_completed():
         "dueDate": None,
         "tags": [],
     }
-    assert _format_task_line(node).startswith("✓")
+    assert format_task_line(node).startswith("✓")
 
 
 def test_format_task_line_dropped():
@@ -406,7 +482,7 @@ def test_format_task_line_dropped():
         "dueDate": None,
         "tags": [],
     }
-    assert _format_task_line(node).startswith("✗")
+    assert format_task_line(node).startswith("✗")
 
 
 def test_print_tree_output(capsys):
@@ -440,14 +516,14 @@ def test_print_tree_output(capsys):
             ],
         },
     ]
-    _print_tree(tree)
+    print_tree(tree)
     output = capsys.readouterr().out
     assert "├── A" in output
     assert "└── B" in output
     assert "    └── B1" in output
 
 
-# ── show command ───────────────────────────────────────────────────────
+# ── project show command ──────────────────────────────────────────────
 
 
 def test_show_renders_tree(monkeypatch):
@@ -483,9 +559,9 @@ def test_show_renders_tree(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["show", "proj1"])
+    result = runner.invoke(cli, ["project", "show", "proj1"])
     assert result.exit_code == 0
     assert "My Project  (2/2 remaining)" in result.output
     assert "Task A" in result.output
@@ -526,9 +602,9 @@ def test_show_filters_completed_by_default(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["show", "proj1"])
+    result = runner.invoke(cli, ["project", "show", "proj1"])
     assert result.exit_code == 0
     assert "Done" not in result.output
     assert "Active" in result.output
@@ -568,9 +644,9 @@ def test_show_filters_empty_groups_after_removing_completed_children(monkeypatch
             ],
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["show", "proj1"])
+    result = runner.invoke(cli, ["project", "show", "proj1"])
     assert result.exit_code == 0
     assert "P  (0/0 remaining)" in result.output
     assert "Phase 1" not in result.output
@@ -598,9 +674,9 @@ def test_show_all_includes_completed(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["show", "proj1", "--all"])
+    result = runner.invoke(cli, ["project", "show", "proj1", "--all"])
     assert result.exit_code == 0
     assert "✓ Done" in result.output
 
@@ -627,9 +703,9 @@ def test_show_json_output(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["show", "proj1", "--json"])
+    result = runner.invoke(cli, ["project", "show", "proj1", "--json"])
     assert result.exit_code == 0
     import json
 
@@ -649,9 +725,9 @@ def test_show_ambiguous_project(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["show", "Proj"])
+    result = runner.invoke(cli, ["project", "show", "Proj"])
     assert result.exit_code == 1
     assert "Multiple projects match" in result.output
 
@@ -660,14 +736,14 @@ def test_show_project_not_found(monkeypatch):
     def fake_run_jxa(_script):
         return {"error": "Project not found"}
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["show", "nonexistent"])
+    result = runner.invoke(cli, ["project", "show", "nonexistent"])
     assert result.exit_code == 1
     assert "Project not found" in result.output
 
 
-# ── ls command ─────────────────────────────────────────────────────────
+# ── project ls command ────────────────────────────────────────────────
 
 
 def test_ls_top_level(monkeypatch):
@@ -689,9 +765,9 @@ def test_ls_top_level(monkeypatch):
             },
         ]
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["ls"])
+    result = runner.invoke(cli, ["project", "ls"])
     assert result.exit_code == 0
     assert "Research/" in result.output
     assert "3/5 projects active" in result.output
@@ -721,9 +797,9 @@ def test_ls_drill_into_folder(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["ls", "Research"])
+    result = runner.invoke(cli, ["project", "ls", "Research"])
     assert result.exit_code == 0
     assert "Research/" in result.output
     assert "Subfolder/" in result.output
@@ -734,11 +810,27 @@ def test_ls_folder_not_found(monkeypatch):
     def fake_run_jxa(_script):
         return {"error": "Folder not found"}
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["ls", "nonexistent"])
+    result = runner.invoke(cli, ["project", "ls", "nonexistent"])
     assert result.exit_code == 1
     assert "Folder not found" in result.output
+
+
+def test_project_ls_script_uses_folder_not_found_error(monkeypatch):
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        return {"error": "Folder not found"}
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "ls", "nonexistent"])
+
+    assert result.exit_code == 1
+    assert len(scripts) == 1
+    assert 'result = {error: "Folder not found"};' in scripts[0]
 
 
 def test_ls_ambiguous_folder(monkeypatch):
@@ -751,9 +843,9 @@ def test_ls_ambiguous_folder(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["ls", "Research"])
+    result = runner.invoke(cli, ["project", "ls", "Research"])
     assert result.exit_code == 1
     assert "Multiple folders match" in result.output
 
@@ -768,9 +860,9 @@ def test_ls_ambiguous_project_fallback(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["ls", "proj"])
+    result = runner.invoke(cli, ["project", "ls", "proj"])
     assert result.exit_code == 1
     assert "Multiple projects match" in result.output
 
@@ -787,11 +879,14 @@ def test_ls_shows_inactive_project_status(monkeypatch):
             },
         ]
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["ls"])
+    result = runner.invoke(cli, ["project", "ls"])
     assert result.exit_code == 0
     assert "(on hold)" in result.output
+
+
+# ── project create command ────────────────────────────────────────────
 
 
 def test_project_create_ambiguous_folder(monkeypatch):
@@ -804,9 +899,11 @@ def test_project_create_ambiguous_folder(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["project-create", "Test Project", "--folder", "Work"])
+    result = runner.invoke(
+        cli, ["project", "create", "Test Project", "--folder", "Work"]
+    )
     assert result.exit_code == 1
     assert "Multiple folders match" in result.output
 
@@ -838,7 +935,7 @@ def test_mark_availability_sequential_parent():
         _make_task("B"),
         _make_task("C"),
     ]
-    _mark_availability(children, parent_sequential=True, today="2026-03-20")
+    mark_availability(children, parent_sequential=True, today="2026-03-20")
     assert children[0]["_available"] is True
     assert children[1]["_available"] is False
     assert children[2]["_available"] is False
@@ -849,7 +946,7 @@ def test_mark_availability_parallel_parent():
         _make_task("A"),
         _make_task("B"),
     ]
-    _mark_availability(children, parent_sequential=False, today="2026-03-20")
+    mark_availability(children, parent_sequential=False, today="2026-03-20")
     assert children[0]["_available"] is True
     assert children[1]["_available"] is True
 
@@ -860,8 +957,7 @@ def test_mark_availability_skips_completed_in_sequential():
         _make_task("Next"),
         _make_task("Later"),
     ]
-    _mark_availability(children, parent_sequential=True, today="2026-03-20")
-    # Completed tasks are not available, but don't block the next one
+    mark_availability(children, parent_sequential=True, today="2026-03-20")
     assert children[0]["_available"] is False  # completed
     assert children[1]["_available"] is True  # first remaining
     assert children[2]["_available"] is False  # blocked
@@ -872,7 +968,7 @@ def test_mark_availability_deferred():
         _make_task("Future", defer="2026-12-01"),
         _make_task("Now"),
     ]
-    _mark_availability(children, parent_sequential=False, today="2026-03-20")
+    mark_availability(children, parent_sequential=False, today="2026-03-20")
     assert children[0]["_available"] is False  # deferred
     assert children[1]["_available"] is True
 
@@ -881,7 +977,7 @@ def test_mark_availability_past_defer_is_available():
     children = [
         _make_task("Past defer", defer="2026-01-01"),
     ]
-    _mark_availability(children, parent_sequential=False, today="2026-03-20")
+    mark_availability(children, parent_sequential=False, today="2026-03-20")
     assert children[0]["_available"] is True
 
 
@@ -890,8 +986,8 @@ def test_filter_available():
         _make_task("A"),
         _make_task("B"),
     ]
-    _mark_availability(children, parent_sequential=True, today="2026-03-20")
-    filtered = _filter_available(children)
+    mark_availability(children, parent_sequential=True, today="2026-03-20")
+    filtered = filter_available(children)
     assert len(filtered) == 1
     assert filtered[0]["name"] == "A"
 
@@ -901,9 +997,8 @@ def test_collect_first_available_parallel():
         _make_task("A"),
         _make_task("B"),
     ]
-    _mark_availability(children, parent_sequential=False, today="2026-03-20")
-    first = _collect_first_available(children)
-    # In parallel, first available is just the first one
+    mark_availability(children, parent_sequential=False, today="2026-03-20")
+    first = collect_first_available(children)
     assert len(first) == 1
     assert first[0]["name"] == "A"
 
@@ -920,8 +1015,8 @@ def test_collect_first_available_nested_sequential():
         ),
         _make_task("Standalone"),
     ]
-    _mark_availability(children, parent_sequential=False, today="2026-03-20")
-    first = _collect_first_available(children)
+    mark_availability(children, parent_sequential=False, today="2026-03-20")
+    first = collect_first_available(children)
     assert len(first) == 1
     assert first[0]["name"] == "G1"
 
@@ -941,9 +1036,9 @@ def test_show_available_flag(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["show", "proj1", "--available"])
+    result = runner.invoke(cli, ["project", "show", "proj1", "--available"])
     assert result.exit_code == 0
     assert "First" in result.output
     assert "Second" not in result.output
@@ -963,9 +1058,9 @@ def test_show_first_flag(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr("ofocus.cli._run_jxa", fake_run_jxa)
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(cli, ["show", "proj1", "--first"])
+    result = runner.invoke(cli, ["project", "show", "proj1", "--first"])
     assert result.exit_code == 0
     assert "first available" in result.output
     assert "First" in result.output
