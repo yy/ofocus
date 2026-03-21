@@ -173,6 +173,36 @@ def show(project, show_all, available, first_available, as_json):
         print_tree(result["children"])
 
 
+@project.command("open")
+@click.argument("project")
+def open_project(project):
+    """Open a project in OmniFocus."""
+    script = (
+        jxa.JS_FUZZY_MATCH
+        + f"""\
+var doc = Application("OmniFocus").defaultDocument;
+var lookup = fuzzyMatch(doc.flattenedProjects(), "{js_escape(project)}");
+if (lookup.error === "not_found") {{
+    JSON.stringify({{error: "Project not found"}});
+}} else if (lookup.error) {{
+    JSON.stringify(lookup);
+}} else {{
+    JSON.stringify({{id: lookup.match.id(), name: lookup.match.name()}});
+}}
+"""
+    )
+    try:
+        result = jxa.run_jxa(script)
+    except OmniError as e:
+        handle_error(e)
+    check_ambiguous(result, "projects")
+    check_result_error(result)
+    import subprocess
+
+    subprocess.run(["open", f"omnifocus:///task/{result['id']}"])
+    click.echo(f"Opened: {result['name']}")
+
+
 @project.command()
 @click.argument("name")
 @click.option("--folder", default=None, help="Parent folder (name or ID)")

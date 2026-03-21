@@ -279,6 +279,43 @@ if (matches.length === 0) {{
         click.echo(f"Deleted: {result.get('name', task_id)}")
 
 
+@task.command("open")
+@click.argument("task_id")
+def open_task(task_id):
+    """Open a task in OmniFocus."""
+    validate_task_id(task_id)
+    script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var query = "{js_escape(task_id)}";
+var all = doc.flattenedTasks();
+var matches = all.filter(function(t) {{ return t.id() === query; }});
+if (matches.length === 0) {{
+    matches = all.filter(function(t) {{ return t.id().indexOf(query) === 0; }});
+}}
+if (matches.length === 0) {{
+    JSON.stringify({{error: "Task not found"}});
+}} else if (matches.length > 1) {{
+    JSON.stringify({{
+        error: "ambiguous",
+        matches: matches.map(function(t) {{ return {{id: t.id(), name: t.name()}}; }})
+    }});
+}} else {{
+    JSON.stringify({{id: matches[0].id(), name: matches[0].name()}});
+}}
+"""
+    try:
+        result = jxa.run_jxa(script)
+    except OmniError as e:
+        handle_error(e)
+    check_ambiguous(result, "tasks")
+    check_result_error(result)
+    import subprocess
+
+    subprocess.run(["open", f"omnifocus:///task/{result['id']}"])
+    click.echo(f"Opened: {result['name']}")
+
+
 @task.command()
 @click.argument("query")
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
