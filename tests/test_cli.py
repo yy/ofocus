@@ -329,6 +329,72 @@ def test_tasks_due_before_uses_local_dates_in_json(monkeypatch):
     )
 
 
+def test_dump_accepts_json_flag(monkeypatch):
+    responses = {
+        JS_TASKS: [{"id": "t1", "name": "Task"}],
+        "projects": [{"id": "p1", "name": "Project"}],
+        "tags": [{"id": "g1", "name": "Tag"}],
+        JS_INBOX: [{"id": "i1", "name": "Inbox"}],
+        "folders": [{"id": "f1", "name": "Folder"}],
+    }
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        if script == JS_TASKS:
+            return responses[JS_TASKS]
+        if script == JS_INBOX:
+            return responses[JS_INBOX]
+        if "flattenedProjects" in script:
+            return responses["projects"]
+        if "flattenedTags" in script:
+            return responses["tags"]
+        if "flattenedFolders" in script:
+            return responses["folders"]
+        raise AssertionError(f"Unexpected script: {script}")
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["dump", "--json"])
+
+    assert result.exit_code == 0
+    assert len(scripts) == 5
+    assert result.output.strip() == (
+        "{\n"
+        '  "inbox": [\n'
+        "    {\n"
+        '      "id": "i1",\n'
+        '      "name": "Inbox"\n'
+        "    }\n"
+        "  ],\n"
+        '  "tasks": [\n'
+        "    {\n"
+        '      "id": "t1",\n'
+        '      "name": "Task"\n'
+        "    }\n"
+        "  ],\n"
+        '  "projects": [\n'
+        "    {\n"
+        '      "id": "p1",\n'
+        '      "name": "Project"\n'
+        "    }\n"
+        "  ],\n"
+        '  "tags": [\n'
+        "    {\n"
+        '      "id": "g1",\n'
+        '      "name": "Tag"\n'
+        "    }\n"
+        "  ],\n"
+        '  "folders": [\n'
+        "    {\n"
+        '      "id": "f1",\n'
+        '      "name": "Folder"\n'
+        "    }\n"
+        "  ]\n"
+        "}"
+    )
+
+
 # ── Tree helpers ───────────────────────────────────────────────────────
 
 SAMPLE_TREE = [

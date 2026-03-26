@@ -79,8 +79,10 @@ JSON.stringify({
 
 
 @cli.command()
-def dump():
+@click.option("--json", "as_json", is_flag=True, help="Output JSON")
+def dump(as_json):
     """Full JSON dump of all active tasks, projects, tags."""
+    del as_json  # `dump` is always JSON, but accept the flag for CLI consistency.
     try:
         tasks_raw = jxa.run_jxa(jxa.JS_TASKS)
         projects_raw = jxa.run_jxa(jxa.JS_PROJECTS)
