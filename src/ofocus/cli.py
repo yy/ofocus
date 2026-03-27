@@ -34,7 +34,9 @@ cli.add_command(tag)
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def stats(as_json):
     """Show quick counts."""
-    script = """\
+    script = (
+        jxa.JS_LOCAL_DATE_HELPERS
+        + """\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
 var inbox = doc.inboxTasks().length;
@@ -46,10 +48,11 @@ var tags = doc.flattenedTags().length;
 var flagged = doc.flattenedTasks().filter(function(t) {
     return t.flagged() && !t.completed() && !t.dropped();
 }).length;
+var today = toLocalDateString(new Date());
 var overdue = doc.flattenedTasks().filter(function(t) {
     if (t.completed() || t.dropped()) return false;
     var d = t.dueDate();
-    return d && d < new Date();
+    return d && toLocalDateString(d) < today;
 }).length;
 JSON.stringify({
     inbox: inbox,
@@ -60,6 +63,7 @@ JSON.stringify({
     overdue: overdue
 });
 """
+    )
     try:
         result = jxa.run_jxa(script)
     except OmniError as e:
