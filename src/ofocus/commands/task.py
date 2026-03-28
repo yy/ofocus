@@ -121,6 +121,7 @@ def update(task_id, name, due, flag, note, project, as_json):
     """Update a task."""
     validate_task_id(task_id)
     updates = []
+    script_prefix = ""
     if name is not None:
         updates.append(f'task.name = "{js_escape(name)}";')
     if due is not None:
@@ -130,16 +131,42 @@ def update(task_id, name, due, flag, note, project, as_json):
     if note is not None:
         updates.append(f'task.note = "{js_escape(note)}";')
     if project is not None:
-        validate_task_id(project)  # same safe-char validation
-        updates.append(f"""\
-var projMatches = doc.flattenedProjects.whose({{id: "{js_escape(project)}"}})();
-if (projMatches.length === 0) {{ throw new Error("Project not found"); }}
-projMatches[0].tasks.push(task);""")
-    if not updates:
+        validate_task_id(project)
+        script_prefix = jxa.JS_FUZZY_MATCH
+    if not updates and project is None:
         click.echo("No updates specified.", err=True)
         sys.exit(1)
     update_code = "\n    ".join(updates)
+    if project is not None:
+        apply_updates = f"    {update_code}\n" if update_code else ""
+        success_code = f"""\
+var projLookup = fuzzyMatch(doc.flattenedProjects(), "{js_escape(project)}");
+    if (projLookup.error === "not_found") {{
+        JSON.stringify({{error: "Project not found"}});
+    }} else if (projLookup.error === "ambiguous") {{
+        JSON.stringify({{error: "ambiguous_project", matches: projLookup.matches}});
+    }} else {{
+        projLookup.match.tasks.push(task);
+{apply_updates}    var proj = task.containingProject();
+        JSON.stringify({{
+            id: task.id(),
+            name: task.name(),
+            flagged: task.flagged(),
+            project: proj ? proj.name() : null
+        }});
+    }}"""
+    else:
+        success_code = f"""\
+{update_code}
+    var proj = task.containingProject();
+    JSON.stringify({{
+        id: task.id(),
+        name: task.name(),
+        flagged: task.flagged(),
+        project: proj ? proj.name() : null
+    }});"""
     script = f"""\
+{script_prefix}\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
 var query = "{js_escape(task_id)}";
@@ -163,14 +190,7 @@ if (matches.length === 0) {{
     }});
 }} else {{
     var task = matches[0];
-    {update_code}
-    var proj = task.containingProject();
-    JSON.stringify({{
-        id: task.id(),
-        name: task.name(),
-        flagged: task.flagged(),
-        project: proj ? proj.name() : null
-    }});
+    {success_code}
 }}
 """
     try:
@@ -178,6 +198,10 @@ if (matches.length === 0) {{
     except OmniError as e:
         handle_error(e)
     check_ambiguous(result, "tasks")
+    if result and result.get("error") == "ambiguous_project":
+        check_ambiguous(
+            {"error": "ambiguous", "matches": result["matches"]}, "projects"
+        )
     check_result_error(result)
     if as_json:
         click.echo(json.dumps(result, indent=2))
