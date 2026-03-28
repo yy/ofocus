@@ -199,7 +199,11 @@ if (lookup.error === "not_found") {{
     check_result_error(result)
     import subprocess
 
-    subprocess.run(["open", f"omnifocus:///task/{result['id']}"])
+    try:
+        subprocess.run(["open", f"omnifocus:///task/{result['id']}"], check=True)
+    except subprocess.CalledProcessError as e:
+        click.echo(f"Error: failed to open OmniFocus URL: {e}", err=True)
+        sys.exit(1)
     click.echo(f"Opened: {result['name']}")
 
 
