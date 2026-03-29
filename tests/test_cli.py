@@ -353,6 +353,45 @@ def test_update_due_uses_local_date_constructor(monkeypatch):
     assert 'new Date("2026-03-15")' not in scripts[0]
 
 
+def test_update_project_uses_prefix_lookup(monkeypatch):
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        return {"id": "abc12345", "name": "Read paper", "flagged": False}
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["task", "update", "abc12345", "--project", "proj1234"]
+    )
+
+    assert result.exit_code == 0
+    assert len(scripts) == 1
+    assert 'fuzzyMatch(doc.flattenedProjects(), "proj1234")' in scripts[0]
+    assert "doc.flattenedProjects.whose({id:" not in scripts[0]
+
+
+def test_update_project_reports_ambiguous_project_matches(monkeypatch):
+    def fake_run_jxa(_script):
+        return {
+            "error": "ambiguous_project",
+            "matches": [
+                {"id": "proj1234aaa", "name": "Project A"},
+                {"id": "proj1234bbb", "name": "Project B"},
+            ],
+        }
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["task", "update", "abc12345", "--project", "proj1234"]
+    )
+
+    assert result.exit_code == 1
+    assert "Multiple projects match" in result.output
+
+
 def test_tasks_due_before_uses_local_dates_in_json(monkeypatch):
     def fake_run_jxa(_script):
         return [
