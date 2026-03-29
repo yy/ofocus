@@ -293,6 +293,32 @@ def test_task_mutation_commands_fail_cleanly_on_ambiguous_prefix(monkeypatch, ar
     assert "Multiple tasks match" in result.output
 
 
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["task", "open", "abc12345"],
+        ["project", "open", "proj1234"],
+    ],
+)
+def test_open_commands_fail_when_open_url_fails(monkeypatch, argv):
+    def fake_run_jxa(_script):
+        return {"id": "abc12345XYZ", "name": "Read paper"}
+
+    def fake_run(cmd, check=False, **_kwargs):
+        if check:
+            raise subprocess.CalledProcessError(returncode=1, cmd=cmd)
+        return subprocess.CompletedProcess(cmd, 1)
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    monkeypatch.setattr("subprocess.run", fake_run)
+    runner = CliRunner()
+    result = runner.invoke(cli, argv)
+
+    assert result.exit_code == 1
+    assert "failed to open OmniFocus URL" in result.output
+    assert "Opened:" not in result.output
+
+
 def test_inbox_add_due_uses_local_date_constructor(monkeypatch):
     scripts = []
 
