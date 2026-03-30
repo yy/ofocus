@@ -115,7 +115,7 @@ if (matches.length === 0) {{
 @click.option("--due", default=None, help="New due date (YYYY-MM-DD)")
 @click.option("--flag/--no-flag", default=None, help="Set/unset flag")
 @click.option("--note", default=None, help="Set note")
-@click.option("--project", default=None, help="Move to project (by project ID)")
+@click.option("--project", default=None, help="Move to project (by name or ID)")
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def update(task_id, name, due, flag, note, project, as_json):
     """Update a task."""
@@ -131,7 +131,6 @@ def update(task_id, name, due, flag, note, project, as_json):
     if note is not None:
         updates.append(f'task.note = "{js_escape(note)}";')
     if project is not None:
-        validate_task_id(project)
         script_prefix = jxa.JS_FUZZY_MATCH
     if not updates and project is None:
         click.echo("No updates specified.", err=True)

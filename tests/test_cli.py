@@ -372,6 +372,30 @@ def test_update_project_uses_prefix_lookup(monkeypatch):
     assert "doc.flattenedProjects.whose({id:" not in scripts[0]
 
 
+def test_update_project_accepts_project_name_lookup(monkeypatch):
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        return {
+            "id": "abc12345",
+            "name": "Read paper",
+            "flagged": False,
+            "project": "Paper writing",
+        }
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["task", "update", "abc12345", "--project", "Paper writing"]
+    )
+
+    assert result.exit_code == 0
+    assert len(scripts) == 1
+    assert 'fuzzyMatch(doc.flattenedProjects(), "Paper writing")' in scripts[0]
+    assert "Updated: Read paper" in result.output
+
+
 def test_update_project_reports_ambiguous_project_matches(monkeypatch):
     def fake_run_jxa(_script):
         return {
