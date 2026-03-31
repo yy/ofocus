@@ -1225,6 +1225,58 @@ def test_show_available_flag(monkeypatch):
     assert "Second" not in result.output
 
 
+def test_show_available_json_omits_internal_availability_field(monkeypatch):
+    def fake_run_jxa(_script):
+        return {
+            "id": "proj1",
+            "name": "Seq Project",
+            "status": "active",
+            "note": "",
+            "sequential": True,
+            "children": [
+                _make_task("First"),
+                _make_task("Second"),
+            ],
+        }
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "show", "proj1", "--available", "--json"])
+
+    assert result.exit_code == 0
+    import json
+
+    data = json.loads(result.output)
+    assert data["children"][0]["name"] == "First"
+    assert "_available" not in data["children"][0]
+
+
+def test_show_first_json_omits_internal_availability_field(monkeypatch):
+    def fake_run_jxa(_script):
+        return {
+            "id": "proj1",
+            "name": "Seq Project",
+            "status": "active",
+            "note": "",
+            "sequential": True,
+            "children": [
+                _make_task("First"),
+                _make_task("Second"),
+            ],
+        }
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "show", "proj1", "--first", "--json"])
+
+    assert result.exit_code == 0
+    import json
+
+    data = json.loads(result.output)
+    assert data[0]["name"] == "First"
+    assert "_available" not in data[0]
+
+
 def test_show_first_flag(monkeypatch):
     def fake_run_jxa(_script):
         return {

@@ -21,6 +21,7 @@ from ofocus.helpers import (
     mark_availability,
     print_ls_items,
     print_tree,
+    strip_internal_fields,
 )
 from ofocus.omni import OmniError
 
@@ -150,6 +151,7 @@ def show(project, show_all, available, first_available, as_json):
         if first_available:
             first_tasks = collect_first_available(result["children"])
             if as_json:
+                strip_internal_fields(first_tasks)
                 click.echo(json.dumps(first_tasks, indent=2))
             else:
                 if not first_tasks:
@@ -165,6 +167,7 @@ def show(project, show_all, available, first_available, as_json):
         remaining, total = count_tasks(result["children"], count_all=True)
         result["remaining"] = remaining
         result["total"] = total
+        strip_internal_fields(result["children"])
         annotate_types(result["children"])
         click.echo(json.dumps(result, indent=2))
     else:

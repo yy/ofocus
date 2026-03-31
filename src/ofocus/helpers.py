@@ -207,6 +207,13 @@ def annotate_types(children: list[dict]):
         annotate_types(kids)
 
 
+def strip_internal_fields(children: list[dict]):
+    """Remove internal helper fields from tree nodes before JSON output."""
+    for node in children:
+        node.pop("_available", None)
+        strip_internal_fields(node.get("children", []))
+
+
 def format_task_line(node: dict) -> str:
     """Format a single task node with decorators."""
     parts = []
