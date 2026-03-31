@@ -53,6 +53,35 @@ function fuzzyMatch(items, query) {
 }
 """
 
+# Reusable JXA function: resolve a task by exact ID or unique ID prefix.
+# Returns {match: task} on unique match, {error: "ambiguous", matches: [...]}
+# on multiple, or {error: "Task not found"} on none.
+JS_FIND_TASK_BY_ID = """\
+function findTaskById(doc, query) {
+    var all = doc.flattenedTasks();
+    var matches = all.filter(function(t) {
+        return t.id() === query;
+    });
+    if (matches.length === 0) {
+        matches = all.filter(function(t) {
+            return t.id().indexOf(query) === 0;
+        });
+    }
+    if (matches.length === 0) {
+        return {error: "Task not found"};
+    }
+    if (matches.length > 1) {
+        return {
+            error: "ambiguous",
+            matches: matches.map(function(t) {
+                return {id: t.id(), name: t.name()};
+            })
+        };
+    }
+    return {match: matches[0]};
+}
+"""
+
 # Reusable JXA: serialize a folder's subfolders and projects into a list.
 JS_SERIALIZE_FOLDER_CONTENTS = """\
 function serializeFolderContents(folder) {

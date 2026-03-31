@@ -69,34 +69,22 @@ def ls(project, tag, flagged, due_before, as_json):
 def complete(task_id, as_json):
     """Mark a task as complete."""
     validate_task_id(task_id)
-    script = f"""\
+    script = (
+        jxa.JS_FIND_TASK_BY_ID
+        + f"""\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
 var query = "{js_escape(task_id)}";
-var all = doc.flattenedTasks();
-var matches = all.filter(function(t) {{
-    return t.id() === query;
-}});
-if (matches.length === 0) {{
-    matches = all.filter(function(t) {{
-        return t.id().indexOf(query) === 0;
-    }});
-}}
-if (matches.length === 0) {{
-    JSON.stringify({{error: "Task not found"}});
-}} else if (matches.length > 1) {{
-    JSON.stringify({{
-        error: "ambiguous",
-        matches: matches.map(function(t) {{
-            return {{id: t.id(), name: t.name()}};
-        }})
-    }});
+var lookup = findTaskById(doc, query);
+if (lookup.error) {{
+    JSON.stringify(lookup);
 }} else {{
-    var task = matches[0];
+    var task = lookup.match;
     app.markComplete(task);
     JSON.stringify({{id: task.id(), name: task.name(), completed: true}});
 }}
 """
+    )
     try:
         result = jxa.run_jxa(script)
     except OmniError as e:
@@ -164,34 +152,22 @@ var projLookup = fuzzyMatch(doc.flattenedProjects(), "{js_escape(project)}");
         flagged: task.flagged(),
         project: proj ? proj.name() : null
     }});"""
-    script = f"""\
-{script_prefix}\
+    script = (
+        script_prefix
+        + jxa.JS_FIND_TASK_BY_ID
+        + f"""\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
 var query = "{js_escape(task_id)}";
-var all = doc.flattenedTasks();
-var matches = all.filter(function(t) {{
-    return t.id() === query;
-}});
-if (matches.length === 0) {{
-    matches = all.filter(function(t) {{
-        return t.id().indexOf(query) === 0;
-    }});
-}}
-if (matches.length === 0) {{
-    JSON.stringify({{error: "Task not found"}});
-}} else if (matches.length > 1) {{
-    JSON.stringify({{
-        error: "ambiguous",
-        matches: matches.map(function(t) {{
-            return {{id: t.id(), name: t.name()}};
-        }})
-    }});
+var lookup = findTaskById(doc, query);
+if (lookup.error) {{
+    JSON.stringify(lookup);
 }} else {{
-    var task = matches[0];
+    var task = lookup.match;
     {success_code}
 }}
 """
+    )
     try:
         result = jxa.run_jxa(script)
     except OmniError as e:
@@ -214,34 +190,22 @@ if (matches.length === 0) {{
 def drop(task_id, as_json):
     """Drop (mark as dropped) a task."""
     validate_task_id(task_id)
-    script = f"""\
+    script = (
+        jxa.JS_FIND_TASK_BY_ID
+        + f"""\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
 var query = "{js_escape(task_id)}";
-var all = doc.flattenedTasks();
-var matches = all.filter(function(t) {{
-    return t.id() === query;
-}});
-if (matches.length === 0) {{
-    matches = all.filter(function(t) {{
-        return t.id().indexOf(query) === 0;
-    }});
-}}
-if (matches.length === 0) {{
-    JSON.stringify({{error: "Task not found"}});
-}} else if (matches.length > 1) {{
-    JSON.stringify({{
-        error: "ambiguous",
-        matches: matches.map(function(t) {{
-            return {{id: t.id(), name: t.name()}};
-        }})
-    }});
+var lookup = findTaskById(doc, query);
+if (lookup.error) {{
+    JSON.stringify(lookup);
 }} else {{
-    var task = matches[0];
+    var task = lookup.match;
     app.markDropped(task);
     JSON.stringify({{id: task.id(), name: task.name(), dropped: true}});
 }}
 """
+    )
     try:
         result = jxa.run_jxa(script)
     except OmniError as e:
@@ -260,36 +224,24 @@ if (matches.length === 0) {{
 def delete(task_id, as_json):
     """Delete a task permanently."""
     validate_task_id(task_id)
-    script = f"""\
+    script = (
+        jxa.JS_FIND_TASK_BY_ID
+        + f"""\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
 var query = "{js_escape(task_id)}";
-var all = doc.flattenedTasks();
-var matches = all.filter(function(t) {{
-    return t.id() === query;
-}});
-if (matches.length === 0) {{
-    matches = all.filter(function(t) {{
-        return t.id().indexOf(query) === 0;
-    }});
-}}
-if (matches.length === 0) {{
-    JSON.stringify({{error: "Task not found"}});
-}} else if (matches.length > 1) {{
-    JSON.stringify({{
-        error: "ambiguous",
-        matches: matches.map(function(t) {{
-            return {{id: t.id(), name: t.name()}};
-        }})
-    }});
+var lookup = findTaskById(doc, query);
+if (lookup.error) {{
+    JSON.stringify(lookup);
 }} else {{
-    var task = matches[0];
+    var task = lookup.match;
     var name = task.name();
     var id = task.id();
     app.delete(task);
     JSON.stringify({{id: id, name: name, deleted: true}});
 }}
 """
+    )
     try:
         result = jxa.run_jxa(script)
     except OmniError as e:
@@ -307,26 +259,20 @@ if (matches.length === 0) {{
 def open_task(task_id):
     """Open a task in OmniFocus."""
     validate_task_id(task_id)
-    script = f"""\
+    script = (
+        jxa.JS_FIND_TASK_BY_ID
+        + f"""\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
 var query = "{js_escape(task_id)}";
-var all = doc.flattenedTasks();
-var matches = all.filter(function(t) {{ return t.id() === query; }});
-if (matches.length === 0) {{
-    matches = all.filter(function(t) {{ return t.id().indexOf(query) === 0; }});
-}}
-if (matches.length === 0) {{
-    JSON.stringify({{error: "Task not found"}});
-}} else if (matches.length > 1) {{
-    JSON.stringify({{
-        error: "ambiguous",
-        matches: matches.map(function(t) {{ return {{id: t.id(), name: t.name()}}; }})
-    }});
+var lookup = findTaskById(doc, query);
+if (lookup.error) {{
+    JSON.stringify(lookup);
 }} else {{
-    JSON.stringify({{id: matches[0].id(), name: matches[0].name()}});
+    JSON.stringify({{id: lookup.match.id(), name: lookup.match.name()}});
 }}
 """
+    )
     try:
         result = jxa.run_jxa(script)
     except OmniError as e:
