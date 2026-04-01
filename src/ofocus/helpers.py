@@ -3,6 +3,7 @@
 import re
 import sys
 from datetime import date
+from typing import Any
 
 import click
 
@@ -65,15 +66,36 @@ def handle_error(e: OmniError):
     sys.exit(1)
 
 
-def check_ambiguous(result: dict | None, item_type: str = "items") -> None:
+def run_jxa_or_exit(script: str) -> Any | None:
+    """Run JXA and exit cleanly with a CLI error if OmniFocus fails."""
+    from ofocus import jxa
+
+    try:
+        return jxa.run_jxa(script)
+    except OmniError as e:
+        handle_error(e)
+
+
+def check_ambiguous(
+    result: dict | None,
+    item_type: str = "items",
+    aliases: dict[str, str] | None = None,
+) -> None:
     """If result is an ambiguous-match error, print matches and exit."""
     if not result:
         return
-    if result.get("error") == "ambiguous":
-        click.echo(f"Multiple {item_type} match. Be more specific:", err=True)
-        for m in result["matches"]:
-            click.echo(f"  {m['id'][:8]}  {m['name']}", err=True)
-        sys.exit(1)
+    error = result.get("error")
+    if error == "ambiguous":
+        matched_item_type = item_type
+    elif aliases and error in aliases:
+        matched_item_type = aliases[error]
+    else:
+        return
+
+    click.echo(f"Multiple {matched_item_type} match. Be more specific:", err=True)
+    for m in result["matches"]:
+        click.echo(f"  {m['id'][:8]}  {m['name']}", err=True)
+    sys.exit(1)
 
 
 def check_result_error(result: dict | None) -> None:

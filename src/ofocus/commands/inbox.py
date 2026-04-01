@@ -5,9 +5,8 @@ import json
 import click
 
 from ofocus import jxa
-from ofocus.helpers import handle_error, js_escape, jxa_local_date_constructor
+from ofocus.helpers import js_escape, jxa_local_date_constructor, run_jxa_or_exit
 from ofocus.models import Task
-from ofocus.omni import OmniError
 
 
 @click.group(invoke_without_command=True)
@@ -17,10 +16,7 @@ def inbox(ctx, as_json):
     """List or manage inbox tasks."""
     if ctx.invoked_subcommand is not None:
         return
-    try:
-        raw = jxa.run_jxa(jxa.JS_INBOX)
-    except OmniError as e:
-        handle_error(e)
+    raw = run_jxa_or_exit(jxa.JS_INBOX)
     tasks = [Task.from_dict(d) for d in (raw or [])]
     if as_json:
         click.echo(json.dumps([t.to_dict() for t in tasks], indent=2))
@@ -52,10 +48,7 @@ doc.inboxTasks.push(task);
         script += f"task.dueDate = {jxa_local_date_constructor(due)};\n"
     script += "JSON.stringify({id: task.id(), name: task.name()});"
 
-    try:
-        result = jxa.run_jxa(script)
-    except OmniError as e:
-        handle_error(e)
+    result = run_jxa_or_exit(script)
     if as_json:
         click.echo(json.dumps(result, indent=2))
     else:

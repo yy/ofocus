@@ -311,13 +311,19 @@ JSON.stringify(result);
 # ── JXA bridge ──────────────────────────────────────────────────────────
 
 JXA_TIMEOUT_SECONDS = 30
+JXA_APP_PREAMBLE = """\
+var __ofocusApp = Application("OmniFocus");
+__ofocusApp.activate();
+delay(0.2);
+"""
 
 
 def run_jxa(script: str) -> Any | None:
     """Run a JXA (not OmniAutomation) script and parse JSON result."""
+    full_script = JXA_APP_PREAMBLE + script
     try:
         result = subprocess.run(
-            ["osascript", "-l", "JavaScript", "-e", script],
+            ["osascript", "-l", "JavaScript", "-e", full_script],
             capture_output=True,
             text=True,
             check=True,

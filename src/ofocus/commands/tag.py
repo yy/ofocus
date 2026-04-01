@@ -5,9 +5,8 @@ import json
 import click
 
 from ofocus import jxa
-from ofocus.helpers import handle_error
+from ofocus.helpers import run_jxa_or_exit
 from ofocus.models import Tag
-from ofocus.omni import OmniError
 
 
 @click.group(invoke_without_command=True)
@@ -22,10 +21,7 @@ def tag(ctx):
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def ls(as_json):
     """List all tags."""
-    try:
-        raw = jxa.run_jxa(jxa.JS_TAGS)
-    except OmniError as e:
-        handle_error(e)
+    raw = run_jxa_or_exit(jxa.JS_TAGS)
     tag_list = [Tag.from_dict(d) for d in (raw or [])]
     if as_json:
         click.echo(

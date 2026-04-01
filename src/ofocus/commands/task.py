@@ -9,14 +9,13 @@ from ofocus import jxa
 from ofocus.helpers import (
     check_ambiguous,
     check_result_error,
-    handle_error,
     js_escape,
     jxa_local_date_constructor,
+    run_jxa_or_exit,
     validate_date,
     validate_task_id,
 )
 from ofocus.models import Task
-from ofocus.omni import OmniError
 
 
 @click.group(invoke_without_command=True)
@@ -35,10 +34,7 @@ def task(ctx):
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def ls(project, tag, flagged, due_before, as_json):
     """List active tasks."""
-    try:
-        raw = jxa.run_jxa(jxa.JS_TASKS)
-    except OmniError as e:
-        handle_error(e)
+    raw = run_jxa_or_exit(jxa.JS_TASKS)
     task_list = [Task.from_dict(d) for d in (raw or [])]
     if project:
         task_list = [
@@ -85,10 +81,7 @@ if (lookup.error) {{
 }}
 """
     )
-    try:
-        result = jxa.run_jxa(script)
-    except OmniError as e:
-        handle_error(e)
+    result = run_jxa_or_exit(script)
     check_ambiguous(result, "tasks")
     check_result_error(result)
     if as_json:
@@ -168,15 +161,8 @@ if (lookup.error) {{
 }}
 """
     )
-    try:
-        result = jxa.run_jxa(script)
-    except OmniError as e:
-        handle_error(e)
-    check_ambiguous(result, "tasks")
-    if result and result.get("error") == "ambiguous_project":
-        check_ambiguous(
-            {"error": "ambiguous", "matches": result["matches"]}, "projects"
-        )
+    result = run_jxa_or_exit(script)
+    check_ambiguous(result, "tasks", aliases={"ambiguous_project": "projects"})
     check_result_error(result)
     if as_json:
         click.echo(json.dumps(result, indent=2))
@@ -206,10 +192,7 @@ if (lookup.error) {{
 }}
 """
     )
-    try:
-        result = jxa.run_jxa(script)
-    except OmniError as e:
-        handle_error(e)
+    result = run_jxa_or_exit(script)
     check_ambiguous(result, "tasks")
     check_result_error(result)
     if as_json:
@@ -242,10 +225,7 @@ if (lookup.error) {{
 }}
 """
     )
-    try:
-        result = jxa.run_jxa(script)
-    except OmniError as e:
-        handle_error(e)
+    result = run_jxa_or_exit(script)
     check_ambiguous(result, "tasks")
     check_result_error(result)
     if as_json:
@@ -273,10 +253,7 @@ if (lookup.error) {{
 }}
 """
     )
-    try:
-        result = jxa.run_jxa(script)
-    except OmniError as e:
-        handle_error(e)
+    result = run_jxa_or_exit(script)
     check_ambiguous(result, "tasks")
     check_result_error(result)
     import subprocess
@@ -294,11 +271,8 @@ if (lookup.error) {{
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def search(query, as_json):
     """Search tasks by name (includes inbox and active tasks)."""
-    try:
-        raw_tasks = jxa.run_jxa(jxa.JS_TASKS)
-        raw_inbox = jxa.run_jxa(jxa.JS_INBOX)
-    except OmniError as e:
-        handle_error(e)
+    raw_tasks = run_jxa_or_exit(jxa.JS_TASKS)
+    raw_inbox = run_jxa_or_exit(jxa.JS_INBOX)
     seen = set()
     task_list = []
     for d in (raw_tasks or []) + (raw_inbox or []):

@@ -9,8 +9,7 @@ from ofocus.commands.inbox import inbox
 from ofocus.commands.project import project
 from ofocus.commands.tag import tag
 from ofocus.commands.task import task
-from ofocus.helpers import handle_error
-from ofocus.omni import OmniError
+from ofocus.helpers import run_jxa_or_exit
 
 # ── CLI ──────────────────────────────────────────────────────────────────
 
@@ -64,10 +63,7 @@ JSON.stringify({
 });
 """
     )
-    try:
-        result = jxa.run_jxa(script)
-    except OmniError as e:
-        handle_error(e)
+    result = run_jxa_or_exit(script)
     if as_json:
         click.echo(json.dumps(result, indent=2))
     else:
@@ -87,14 +83,11 @@ JSON.stringify({
 def dump(as_json):
     """Full JSON dump of all active tasks, projects, tags."""
     del as_json  # `dump` is always JSON, but accept the flag for CLI consistency.
-    try:
-        tasks_raw = jxa.run_jxa(jxa.JS_TASKS)
-        projects_raw = jxa.run_jxa(jxa.JS_PROJECTS)
-        tags_raw = jxa.run_jxa(jxa.JS_TAGS)
-        inbox_raw = jxa.run_jxa(jxa.JS_INBOX)
-        folders_raw = jxa.run_jxa(jxa.JS_FOLDERS)
-    except OmniError as e:
-        handle_error(e)
+    tasks_raw = run_jxa_or_exit(jxa.JS_TASKS)
+    projects_raw = run_jxa_or_exit(jxa.JS_PROJECTS)
+    tags_raw = run_jxa_or_exit(jxa.JS_TAGS)
+    inbox_raw = run_jxa_or_exit(jxa.JS_INBOX)
+    folders_raw = run_jxa_or_exit(jxa.JS_FOLDERS)
     result = {
         "inbox": inbox_raw or [],
         "tasks": tasks_raw or [],

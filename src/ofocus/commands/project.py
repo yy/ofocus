@@ -16,14 +16,13 @@ from ofocus.helpers import (
     filter_available,
     filter_tree,
     format_task_line,
-    handle_error,
     js_escape,
     mark_availability,
     print_ls_items,
     print_tree,
+    run_jxa_or_exit,
     strip_internal_fields,
 )
-from ofocus.omni import OmniError
 
 
 @click.group(invoke_without_command=True)
@@ -77,16 +76,12 @@ if (folderLookup.match) {{
 JSON.stringify(result);
 """
         )
-        try:
-            result = jxa.run_jxa(script)
-        except OmniError as e:
-            handle_error(e)
-        check_ambiguous(result, "folders")
-        # Project fallback also returns ambiguous via "ambiguous_project" key
-        if result and result.get("error") == "ambiguous_project":
-            check_ambiguous(
-                {"error": "ambiguous", "matches": result["matches"]}, "projects"
-            )
+        result = run_jxa_or_exit(script)
+        check_ambiguous(
+            result,
+            "folders",
+            aliases={"ambiguous_project": "projects"},
+        )
         if result and result.get("error") == "is_project":
             # Redirect to show command
             ctx = click.get_current_context()
@@ -106,10 +101,7 @@ JSON.stringify(result);
             click.echo(f"{result['folder']}/")
             print_ls_items(result.get("children", []))
     else:
-        try:
-            raw = jxa.run_jxa(jxa.JS_TOP_LEVEL)
-        except OmniError as e:
-            handle_error(e)
+        raw = run_jxa_or_exit(jxa.JS_TOP_LEVEL)
         if as_json:
             click.echo(json.dumps(raw, indent=2))
         else:
@@ -132,10 +124,7 @@ JSON.stringify(result);
 def show(project, show_all, available, first_available, as_json):
     """Show a project's tasks as a tree."""
     script = jxa.JS_SHOW_PROJECT.replace("__QUERY__", js_escape(project))
-    try:
-        result = jxa.run_jxa(script)
-    except OmniError as e:
-        handle_error(e)
+    result = run_jxa_or_exit(script)
     if not result:
         click.echo("Error: no result from OmniFocus", err=True)
         sys.exit(1)
@@ -194,10 +183,7 @@ if (lookup.error === "not_found") {{
 }}
 """
     )
-    try:
-        result = jxa.run_jxa(script)
-    except OmniError as e:
-        handle_error(e)
+    result = run_jxa_or_exit(script)
     check_ambiguous(result, "projects")
     check_result_error(result)
     import subprocess
@@ -246,10 +232,7 @@ var proj = app.Project({{name: "{js_escape(name)}"}});
 doc.projects.push(proj);
 JSON.stringify({{id: proj.id(), name: proj.name()}});
 """
-    try:
-        result = jxa.run_jxa(script)
-    except OmniError as e:
-        handle_error(e)
+    result = run_jxa_or_exit(script)
     check_ambiguous(result, "folders")
     check_result_error(result)
     if as_json:

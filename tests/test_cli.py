@@ -9,6 +9,7 @@ from ofocus import __version__
 from ofocus.cli import cli
 from ofocus.helpers import (
     annotate_types,
+    check_ambiguous,
     collect_first_available,
     count_tasks,
     filter_available,
@@ -18,6 +19,7 @@ from ofocus.helpers import (
     jxa_local_date_constructor,
     mark_availability,
     print_tree,
+    run_jxa_or_exit,
     validate_date,
     validate_task_id,
 )
@@ -227,6 +229,56 @@ def test_run_jxa_empty_output_raises_omnierror(monkeypatch):
 
     with pytest.raises(OmniError, match="empty output"):
         run_jxa("JSON.stringify({ok: true});")
+
+
+def test_run_jxa_activates_omnifocus_before_script(monkeypatch):
+    scripts = []
+
+    class Result:
+        stdout = '{"ok": true}'
+
+    def fake_run(args, **_kwargs):
+        scripts.append(args[-1])
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    result = run_jxa("JSON.stringify({ok: true});")
+
+    assert result == {"ok": True}
+    assert len(scripts) == 1
+    assert 'var __ofocusApp = Application("OmniFocus");' in scripts[0]
+    assert "__ofocusApp.activate();" in scripts[0]
+    assert "delay(0.2);" in scripts[0]
+    assert scripts[0].endswith("JSON.stringify({ok: true});")
+
+
+def test_run_jxa_or_exit_exits_cleanly_on_omnierror(monkeypatch, capsys):
+    def fake_run_jxa(_script):
+        raise OmniError("boom")
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+
+    with pytest.raises(SystemExit):
+        run_jxa_or_exit("JSON.stringify({ok: true});")
+
+    assert "Error: boom" in capsys.readouterr().err
+
+
+def test_check_ambiguous_accepts_alias_errors(capsys):
+    with pytest.raises(SystemExit):
+        check_ambiguous(
+            {
+                "error": "ambiguous_project",
+                "matches": [
+                    {"id": "p1234567", "name": "Project A"},
+                    {"id": "p7654321", "name": "Project B"},
+                ],
+            },
+            aliases={"ambiguous_project": "projects"},
+        )
+
+    assert "Multiple projects match" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
