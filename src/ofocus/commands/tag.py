@@ -10,11 +10,15 @@ from ofocus.models import Tag
 
 
 @click.group(invoke_without_command=True)
+@click.option("--json", "as_json", is_flag=True, help="Output JSON")
 @click.pass_context
-def tag(ctx):
+def tag(ctx, as_json):
     """Manage tags."""
     if ctx.invoked_subcommand is None:
-        ctx.invoke(ls)
+        ctx.invoke(ls, as_json=as_json)
+    elif ctx.invoked_subcommand == "ls" and as_json:
+        ctx.default_map = ctx.default_map or {}
+        ctx.default_map.setdefault("ls", {})["as_json"] = as_json
 
 
 @tag.command("ls")

@@ -3,6 +3,7 @@
 import re
 import sys
 from datetime import date
+from textwrap import indent
 from typing import Any
 
 import click
@@ -76,6 +77,33 @@ def run_jxa_or_exit(script: str) -> Any | None:
         handle_error(e)
 
 
+def build_task_lookup_script(
+    task_id: str,
+    success_code: str,
+    *,
+    script_prefix: str = "",
+) -> str:
+    """Build a JXA script that resolves a task by exact ID or unique prefix."""
+    from ofocus import jxa
+
+    return (
+        script_prefix
+        + jxa.JS_FIND_TASK_BY_ID
+        + f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var query = "{js_escape(task_id)}";
+var lookup = findTaskById(doc, query);
+if (lookup.error) {{
+    JSON.stringify(lookup);
+}} else {{
+    var task = lookup.match;
+{indent(success_code.rstrip(), "    ")}
+}}
+"""
+    )
+
+
 def check_ambiguous(
     result: dict | None,
     item_type: str = "items",
@@ -102,6 +130,37 @@ def check_result_error(result: dict | None) -> None:
     """If result contains a generic error, print it and exit."""
     if result and result.get("error"):
         click.echo(f"Error: {result['error']}", err=True)
+        sys.exit(1)
+
+
+def run_task_lookup_or_exit(
+    task_id: str,
+    success_code: str,
+    *,
+    script_prefix: str = "",
+    aliases: dict[str, str] | None = None,
+) -> dict:
+    """Run a task lookup script and exit cleanly on ambiguous or error results."""
+    result = run_jxa_or_exit(
+        build_task_lookup_script(
+            task_id,
+            success_code,
+            script_prefix=script_prefix,
+        )
+    )
+    check_ambiguous(result, "tasks", aliases=aliases)
+    check_result_error(result)
+    return result or {}
+
+
+def open_omnifocus_task(item_id: str) -> None:
+    """Open an OmniFocus task by ID via the app URL scheme."""
+    import subprocess
+
+    try:
+        subprocess.run(["open", f"omnifocus:///task/{item_id}"], check=True)
+    except subprocess.CalledProcessError as e:
+        click.echo(f"Error: failed to open OmniFocus URL: {e}", err=True)
         sys.exit(1)
 
 
@@ -204,14 +263,14 @@ def filter_tree(children: list[dict]) -> list[dict]:
     return filtered
 
 
-def count_tasks(children: list[dict], count_all: bool = False) -> tuple[int, int]:
+def count_tasks(children: list[dict]) -> tuple[int, int]:
     """Count (remaining, total) leaf tasks in the tree."""
     remaining = 0
     total = 0
     for node in children:
         kids = node.get("children", [])
         if kids:
-            r, t = count_tasks(kids, count_all=True)
+            r, t = count_tasks(kids)
             remaining += r
             total += t
         else:

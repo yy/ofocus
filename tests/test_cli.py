@@ -414,9 +414,7 @@ def test_update_project_uses_prefix_lookup(monkeypatch):
 
     monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["task", "update", "abc12345", "--project", "proj1234"]
-    )
+    result = runner.invoke(cli, ["task", "update", "abc12345", "--project", "proj1234"])
 
     assert result.exit_code == 0
     assert len(scripts) == 1
@@ -460,9 +458,7 @@ def test_update_project_reports_ambiguous_project_matches(monkeypatch):
 
     monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["task", "update", "abc12345", "--project", "proj1234"]
-    )
+    result = runner.invoke(cli, ["task", "update", "abc12345", "--project", "proj1234"])
 
     assert result.exit_code == 1
     assert "Multiple projects match" in result.output
@@ -642,14 +638,14 @@ def test_filter_tree_preserves_all_when_nothing_completed():
 
 
 def test_count_tasks_leaf_only():
-    remaining, total = count_tasks(SAMPLE_TREE, count_all=True)
+    remaining, total = count_tasks(SAMPLE_TREE)
     assert total == 4
     assert remaining == 2
 
 
 def test_count_tasks_after_filter():
     filtered = filter_tree(SAMPLE_TREE)
-    remaining, total = count_tasks(filtered, count_all=True)
+    remaining, total = count_tasks(filtered)
     assert total == 2
     assert remaining == 2
 
@@ -1006,6 +1002,196 @@ def test_ls_top_level(monkeypatch):
     assert "3/5 projects active" in result.output
     assert "Misc" in result.output
     assert "10 tasks" in result.output
+
+
+def test_task_group_forwards_ls_options(monkeypatch):
+    def fake_run_jxa(_script):
+        return [
+            {
+                "id": "a1",
+                "name": "Flagged task",
+                "flagged": True,
+                "completed": False,
+                "dueDate": None,
+                "note": None,
+                "project": "Work",
+                "tags": [],
+            },
+            {
+                "id": "a2",
+                "name": "Plain task",
+                "flagged": False,
+                "completed": False,
+                "dueDate": None,
+                "note": None,
+                "project": "Work",
+                "tags": [],
+            },
+        ]
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["task", "--flagged", "--json"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == (
+        "[\n"
+        "  {\n"
+        '    "id": "a1",\n'
+        '    "name": "Flagged task",\n'
+        '    "flagged": true,\n'
+        '    "completed": false,\n'
+        '    "dueDate": null,\n'
+        '    "note": null,\n'
+        '    "project": "Work",\n'
+        '    "tags": []\n'
+        "  }\n"
+        "]"
+    )
+
+
+def test_project_group_forwards_json_option(monkeypatch):
+    def fake_run_jxa(_script):
+        return [
+            {
+                "type": "project",
+                "id": "p1",
+                "name": "Misc",
+                "status": "active",
+                "taskCount": 10,
+            },
+        ]
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "--json"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == (
+        "[\n"
+        "  {\n"
+        '    "type": "project",\n'
+        '    "id": "p1",\n'
+        '    "name": "Misc",\n'
+        '    "status": "active",\n'
+        '    "taskCount": 10\n'
+        "  }\n"
+        "]"
+    )
+
+
+def test_tag_group_forwards_json_option(monkeypatch):
+    def fake_run_jxa(_script):
+        return [
+            {
+                "id": "t1",
+                "name": "urgent",
+            },
+        ]
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["tag", "--json"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == (
+        '[\n  {\n    "id": "t1",\n    "name": "urgent"\n  }\n]'
+    )
+
+
+def test_task_group_forwards_options_to_explicit_ls_subcommand(monkeypatch):
+    def fake_run_jxa(_script):
+        return [
+            {
+                "id": "a1",
+                "name": "Flagged task",
+                "flagged": True,
+                "completed": False,
+                "dueDate": None,
+                "note": None,
+                "project": "Work",
+                "tags": [],
+            },
+            {
+                "id": "a2",
+                "name": "Plain task",
+                "flagged": False,
+                "completed": False,
+                "dueDate": None,
+                "note": None,
+                "project": "Work",
+                "tags": [],
+            },
+        ]
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["task", "--flagged", "ls", "--json"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == (
+        "[\n"
+        "  {\n"
+        '    "id": "a1",\n'
+        '    "name": "Flagged task",\n'
+        '    "flagged": true,\n'
+        '    "completed": false,\n'
+        '    "dueDate": null,\n'
+        '    "note": null,\n'
+        '    "project": "Work",\n'
+        '    "tags": []\n'
+        "  }\n"
+        "]"
+    )
+
+
+def test_project_group_forwards_json_to_explicit_ls_subcommand(monkeypatch):
+    def fake_run_jxa(_script):
+        return [
+            {
+                "type": "project",
+                "id": "p1",
+                "name": "Misc",
+                "status": "active",
+                "taskCount": 10,
+            },
+        ]
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "--json", "ls"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == (
+        "[\n"
+        "  {\n"
+        '    "type": "project",\n'
+        '    "id": "p1",\n'
+        '    "name": "Misc",\n'
+        '    "status": "active",\n'
+        '    "taskCount": 10\n'
+        "  }\n"
+        "]"
+    )
+
+
+def test_tag_group_forwards_json_to_explicit_ls_subcommand(monkeypatch):
+    def fake_run_jxa(_script):
+        return [
+            {
+                "id": "t1",
+                "name": "urgent",
+            },
+        ]
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["tag", "--json", "ls"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == (
+        '[\n  {\n    "id": "t1",\n    "name": "urgent"\n  }\n]'
+    )
 
 
 def test_ls_drill_into_folder(monkeypatch):

@@ -18,6 +18,7 @@ from ofocus.helpers import (
     format_task_line,
     js_escape,
     mark_availability,
+    open_omnifocus_task,
     print_ls_items,
     print_tree,
     run_jxa_or_exit,
@@ -26,11 +27,15 @@ from ofocus.helpers import (
 
 
 @click.group(invoke_without_command=True)
+@click.option("--json", "as_json", is_flag=True, help="Output JSON")
 @click.pass_context
-def project(ctx):
+def project(ctx, as_json):
     """Manage projects."""
     if ctx.invoked_subcommand is None:
-        ctx.invoke(ls)
+        ctx.invoke(ls, folder=None, as_json=as_json)
+    elif ctx.invoked_subcommand == "ls" and as_json:
+        ctx.default_map = ctx.default_map or {}
+        ctx.default_map.setdefault("ls", {})["as_json"] = as_json
 
 
 @project.command("ls")
@@ -153,14 +158,14 @@ def show(project, show_all, available, first_available, as_json):
         result["children"] = filter_available(result["children"])
 
     if as_json:
-        remaining, total = count_tasks(result["children"], count_all=True)
+        remaining, total = count_tasks(result["children"])
         result["remaining"] = remaining
         result["total"] = total
         strip_internal_fields(result["children"])
         annotate_types(result["children"])
         click.echo(json.dumps(result, indent=2))
     else:
-        remaining, total = count_tasks(result["children"], count_all=True)
+        remaining, total = count_tasks(result["children"])
         click.echo(f"{result['name']}  ({remaining}/{total} remaining)")
         print_tree(result["children"])
 
@@ -186,13 +191,7 @@ if (lookup.error === "not_found") {{
     result = run_jxa_or_exit(script)
     check_ambiguous(result, "projects")
     check_result_error(result)
-    import subprocess
-
-    try:
-        subprocess.run(["open", f"omnifocus:///task/{result['id']}"], check=True)
-    except subprocess.CalledProcessError as e:
-        click.echo(f"Error: failed to open OmniFocus URL: {e}", err=True)
-        sys.exit(1)
+    open_omnifocus_task(result["id"])
     click.echo(f"Opened: {result['name']}")
 
 

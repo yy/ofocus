@@ -2,16 +2,17 @@
 
 import json
 import sys
+from textwrap import indent
 
 import click
 
 from ofocus import jxa
 from ofocus.helpers import (
-    check_ambiguous,
-    check_result_error,
     js_escape,
     jxa_local_date_constructor,
+    open_omnifocus_task,
     run_jxa_or_exit,
+    run_task_lookup_or_exit,
     validate_date,
     validate_task_id,
 )
@@ -19,11 +20,41 @@ from ofocus.models import Task
 
 
 @click.group(invoke_without_command=True)
+@click.option(
+    "--project",
+    "project_filter",
+    default=None,
+    help="Filter by project name",
+)
+@click.option("--tag", default=None, help="Filter by tag name")
+@click.option("--flagged", is_flag=True, help="Flagged only")
+@click.option("--due-before", default=None, help="Tasks due before date (YYYY-MM-DD)")
+@click.option("--json", "as_json", is_flag=True, help="Output JSON")
 @click.pass_context
-def task(ctx):
+def task(ctx, project_filter, tag, flagged, due_before, as_json):
     """Manage tasks."""
     if ctx.invoked_subcommand is None:
-        ctx.invoke(ls)
+        ctx.invoke(
+            ls,
+            project=project_filter,
+            tag=tag,
+            flagged=flagged,
+            due_before=due_before,
+            as_json=as_json,
+        )
+    elif ctx.invoked_subcommand == "ls":
+        ctx.default_map = ctx.default_map or {}
+        ls_defaults = ctx.default_map.setdefault("ls", {})
+        if project_filter is not None:
+            ls_defaults["project"] = project_filter
+        if tag is not None:
+            ls_defaults["tag"] = tag
+        if flagged:
+            ls_defaults["flagged"] = flagged
+        if due_before is not None:
+            ls_defaults["due_before"] = due_before
+        if as_json:
+            ls_defaults["as_json"] = as_json
 
 
 @task.command("ls")
@@ -65,25 +96,13 @@ def ls(project, tag, flagged, due_before, as_json):
 def complete(task_id, as_json):
     """Mark a task as complete."""
     validate_task_id(task_id)
-    script = (
-        jxa.JS_FIND_TASK_BY_ID
-        + f"""\
-var app = Application("OmniFocus");
-var doc = app.defaultDocument;
-var query = "{js_escape(task_id)}";
-var lookup = findTaskById(doc, query);
-if (lookup.error) {{
-    JSON.stringify(lookup);
-}} else {{
-    var task = lookup.match;
-    app.markComplete(task);
-    JSON.stringify({{id: task.id(), name: task.name(), completed: true}});
-}}
-"""
+    result = run_task_lookup_or_exit(
+        task_id,
+        """\
+app.markComplete(task);
+JSON.stringify({id: task.id(), name: task.name(), completed: true});
+""",
     )
-    result = run_jxa_or_exit(script)
-    check_ambiguous(result, "tasks")
-    check_result_error(result)
     if as_json:
         click.echo(json.dumps(result, indent=2))
     else:
@@ -116,54 +135,41 @@ def update(task_id, name, due, flag, note, project, as_json):
     if not updates and project is None:
         click.echo("No updates specified.", err=True)
         sys.exit(1)
-    update_code = "\n    ".join(updates)
+    update_code = "\n".join(updates)
     if project is not None:
-        apply_updates = f"    {update_code}\n" if update_code else ""
+        apply_updates = f"{indent(update_code, '    ')}\n" if update_code else ""
         success_code = f"""\
 var projLookup = fuzzyMatch(doc.flattenedProjects(), "{js_escape(project)}");
-    if (projLookup.error === "not_found") {{
-        JSON.stringify({{error: "Project not found"}});
-    }} else if (projLookup.error === "ambiguous") {{
-        JSON.stringify({{error: "ambiguous_project", matches: projLookup.matches}});
-    }} else {{
-        projLookup.match.tasks.push(task);
+if (projLookup.error === "not_found") {{
+    JSON.stringify({{error: "Project not found"}});
+}} else if (projLookup.error === "ambiguous") {{
+    JSON.stringify({{error: "ambiguous_project", matches: projLookup.matches}});
+}} else {{
+    projLookup.match.tasks.push(task);
 {apply_updates}    var proj = task.containingProject();
-        JSON.stringify({{
-            id: task.id(),
-            name: task.name(),
-            flagged: task.flagged(),
-            project: proj ? proj.name() : null
-        }});
-    }}"""
-    else:
-        success_code = f"""\
-{update_code}
-    var proj = task.containingProject();
     JSON.stringify({{
         id: task.id(),
         name: task.name(),
         flagged: task.flagged(),
         project: proj ? proj.name() : null
-    }});"""
-    script = (
-        script_prefix
-        + jxa.JS_FIND_TASK_BY_ID
-        + f"""\
-var app = Application("OmniFocus");
-var doc = app.defaultDocument;
-var query = "{js_escape(task_id)}";
-var lookup = findTaskById(doc, query);
-if (lookup.error) {{
-    JSON.stringify(lookup);
-}} else {{
-    var task = lookup.match;
-    {success_code}
-}}
-"""
+    }});
+}}"""
+    else:
+        success_code = f"""\
+{update_code}
+var proj = task.containingProject();
+JSON.stringify({{
+    id: task.id(),
+    name: task.name(),
+    flagged: task.flagged(),
+    project: proj ? proj.name() : null
+}});"""
+    result = run_task_lookup_or_exit(
+        task_id,
+        success_code,
+        script_prefix=script_prefix,
+        aliases={"ambiguous_project": "projects"},
     )
-    result = run_jxa_or_exit(script)
-    check_ambiguous(result, "tasks", aliases={"ambiguous_project": "projects"})
-    check_result_error(result)
     if as_json:
         click.echo(json.dumps(result, indent=2))
     else:
@@ -176,25 +182,13 @@ if (lookup.error) {{
 def drop(task_id, as_json):
     """Drop (mark as dropped) a task."""
     validate_task_id(task_id)
-    script = (
-        jxa.JS_FIND_TASK_BY_ID
-        + f"""\
-var app = Application("OmniFocus");
-var doc = app.defaultDocument;
-var query = "{js_escape(task_id)}";
-var lookup = findTaskById(doc, query);
-if (lookup.error) {{
-    JSON.stringify(lookup);
-}} else {{
-    var task = lookup.match;
-    app.markDropped(task);
-    JSON.stringify({{id: task.id(), name: task.name(), dropped: true}});
-}}
-"""
+    result = run_task_lookup_or_exit(
+        task_id,
+        """\
+app.markDropped(task);
+JSON.stringify({id: task.id(), name: task.name(), dropped: true});
+""",
     )
-    result = run_jxa_or_exit(script)
-    check_ambiguous(result, "tasks")
-    check_result_error(result)
     if as_json:
         click.echo(json.dumps(result, indent=2))
     else:
@@ -207,27 +201,15 @@ if (lookup.error) {{
 def delete(task_id, as_json):
     """Delete a task permanently."""
     validate_task_id(task_id)
-    script = (
-        jxa.JS_FIND_TASK_BY_ID
-        + f"""\
-var app = Application("OmniFocus");
-var doc = app.defaultDocument;
-var query = "{js_escape(task_id)}";
-var lookup = findTaskById(doc, query);
-if (lookup.error) {{
-    JSON.stringify(lookup);
-}} else {{
-    var task = lookup.match;
-    var name = task.name();
-    var id = task.id();
-    app.delete(task);
-    JSON.stringify({{id: id, name: name, deleted: true}});
-}}
-"""
+    result = run_task_lookup_or_exit(
+        task_id,
+        """\
+var name = task.name();
+var id = task.id();
+app.delete(task);
+JSON.stringify({id: id, name: name, deleted: true});
+""",
     )
-    result = run_jxa_or_exit(script)
-    check_ambiguous(result, "tasks")
-    check_result_error(result)
     if as_json:
         click.echo(json.dumps(result, indent=2))
     else:
@@ -239,30 +221,13 @@ if (lookup.error) {{
 def open_task(task_id):
     """Open a task in OmniFocus."""
     validate_task_id(task_id)
-    script = (
-        jxa.JS_FIND_TASK_BY_ID
-        + f"""\
-var app = Application("OmniFocus");
-var doc = app.defaultDocument;
-var query = "{js_escape(task_id)}";
-var lookup = findTaskById(doc, query);
-if (lookup.error) {{
-    JSON.stringify(lookup);
-}} else {{
-    JSON.stringify({{id: lookup.match.id(), name: lookup.match.name()}});
-}}
-"""
+    result = run_task_lookup_or_exit(
+        task_id,
+        """\
+JSON.stringify({id: task.id(), name: task.name()});
+""",
     )
-    result = run_jxa_or_exit(script)
-    check_ambiguous(result, "tasks")
-    check_result_error(result)
-    import subprocess
-
-    try:
-        subprocess.run(["open", f"omnifocus:///task/{result['id']}"], check=True)
-    except subprocess.CalledProcessError as e:
-        click.echo(f"Error: failed to open OmniFocus URL: {e}", err=True)
-        sys.exit(1)
+    open_omnifocus_task(result["id"])
     click.echo(f"Opened: {result['name']}")
 
 
