@@ -35,21 +35,22 @@ def stats(as_json):
     """Show quick counts."""
     script = (
         jxa.JS_LOCAL_DATE_HELPERS
+        + jxa.JS_ACTION_TASK_HELPERS
         + """\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
 var inbox = doc.inboxTasks().length;
 var active = doc.flattenedTasks().filter(function(t) {
-    return !t.completed() && !t.dropped();
+    return isIndividualAction(t) && !t.completed() && !t.dropped();
 }).length;
 var projects = doc.flattenedProjects().length;
 var tags = doc.flattenedTags().length;
 var flagged = doc.flattenedTasks().filter(function(t) {
-    return t.flagged() && !t.completed() && !t.dropped();
+    return isIndividualAction(t) && t.flagged() && !t.completed() && !t.dropped();
 }).length;
 var today = toLocalDateString(new Date());
 var overdue = doc.flattenedTasks().filter(function(t) {
-    if (t.completed() || t.dropped()) return false;
+    if (!isIndividualAction(t) || t.completed() || t.dropped()) return false;
     var d = t.dueDate();
     return d && toLocalDateString(d) < today;
 }).length;

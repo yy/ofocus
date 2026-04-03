@@ -155,6 +155,12 @@ def test_js_tasks_excludes_dropped():
     assert "!t.dropped()" in JS_TASKS
 
 
+def test_js_tasks_excludes_project_roots_and_task_groups():
+    assert "isIndividualAction" in JS_TASKS
+    assert "!t.project()" in JS_TASKS
+    assert "t.tasks().length === 0" in JS_TASKS
+
+
 def test_js_due_dates_use_local_date_strings():
     assert "toLocalDateString" in JS_INBOX
     assert "toLocalDateString" in JS_TASKS
@@ -182,6 +188,9 @@ def test_stats_excludes_dropped_from_active_and_overdue(monkeypatch):
 
     assert result.exit_code == 0
     assert len(scripts) == 1
+    assert "isIndividualAction" in scripts[0]
+    assert "!t.project()" in scripts[0]
+    assert "t.tasks().length === 0" in scripts[0]
     assert "!t.dropped()" in scripts[0]
     assert "t.completed() || t.dropped()" in scripts[0]
 

@@ -18,6 +18,12 @@ function toLocalDateString(d) {
 }
 """
 
+JS_ACTION_TASK_HELPERS = """\
+function isIndividualAction(t) {
+    return !t.project() && t.tasks().length === 0;
+}
+"""
+
 # Reusable JXA function: fuzzy-match an item from a list by ID or name.
 # Returns {match: item} on unique match, {error: "ambiguous", matches: [...]}
 # on multiple, or {error: "not_found"} on none.
@@ -154,10 +160,11 @@ JS_TASKS = (
     """\
 """
     + JS_LOCAL_DATE_HELPERS
+    + JS_ACTION_TASK_HELPERS
     + """\
 var doc = Application("OmniFocus").defaultDocument;
 var tasks = doc.flattenedTasks().filter(function(t) {
-    return !t.completed() && !t.dropped();
+    return isIndividualAction(t) && !t.completed() && !t.dropped();
 }).map(function(t) {
     var tags = t.tags().map(function(tg) { return tg.name(); });
     var proj = t.containingProject();
