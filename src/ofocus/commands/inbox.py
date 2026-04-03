@@ -5,8 +5,13 @@ import json
 import click
 
 from ofocus import jxa
-from ofocus.helpers import js_escape, jxa_local_date_constructor, run_jxa_or_exit
-from ofocus.models import Task
+from ofocus.helpers import (
+    echo_task_list,
+    js_escape,
+    jxa_local_date_constructor,
+    load_task_list,
+    run_jxa_or_exit,
+)
 
 
 @click.group(invoke_without_command=True)
@@ -16,14 +21,8 @@ def inbox(ctx, as_json):
     """List or manage inbox tasks."""
     if ctx.invoked_subcommand is not None:
         return
-    raw = run_jxa_or_exit(jxa.JS_INBOX)
-    tasks = [Task.from_dict(d) for d in (raw or [])]
-    if as_json:
-        click.echo(json.dumps([t.to_dict() for t in tasks], indent=2))
-    else:
-        click.echo(f"{len(tasks)} inbox tasks:")
-        for t in tasks:
-            click.echo(f"  {t.id[:8]}  {t.to_line()}")
+    tasks = load_task_list(jxa.JS_INBOX)
+    echo_task_list(tasks, "inbox tasks", as_json)
 
 
 @inbox.command("add")

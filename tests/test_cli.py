@@ -12,11 +12,14 @@ from ofocus.helpers import (
     check_ambiguous,
     collect_first_available,
     count_tasks,
+    echo_task_list,
     filter_available,
     filter_tree,
     format_task_line,
     js_escape,
     jxa_local_date_constructor,
+    load_task_list,
+    load_unique_task_list,
     mark_availability,
     print_tree,
     run_jxa_or_exit,
@@ -24,6 +27,7 @@ from ofocus.helpers import (
     validate_task_id,
 )
 from ofocus.jxa import JS_INBOX, JS_TASKS, run_jxa
+from ofocus.models import Task
 from ofocus.omni import OmniError
 
 # Patch target for jxa.run_jxa as used by each command module
@@ -265,6 +269,56 @@ def test_run_jxa_or_exit_exits_cleanly_on_omnierror(monkeypatch, capsys):
     assert "Error: boom" in capsys.readouterr().err
 
 
+def test_load_task_list_parses_results(monkeypatch):
+    def fake_run_jxa(_script):
+        return [{"id": "abc123", "name": "Read paper", "tags": ["urgent"]}]
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+
+    tasks = load_task_list("tasks script")
+
+    assert len(tasks) == 1
+    assert tasks[0].id == "abc123"
+    assert tasks[0].name == "Read paper"
+    assert tasks[0].tags == ["urgent"]
+
+
+def test_load_unique_task_list_dedupes_by_id(monkeypatch):
+    def fake_run_jxa(script):
+        if script == "tasks script":
+            return [
+                {"id": "a1", "name": "Read paper"},
+                {"id": "a2", "name": "Email advisor"},
+            ]
+        if script == "inbox script":
+            return [
+                {"id": "a1", "name": "Read paper"},
+                {"id": "a3", "name": "Buy milk"},
+            ]
+        raise AssertionError(f"Unexpected script: {script}")
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+
+    tasks = load_unique_task_list("tasks script", "inbox script")
+
+    assert [task.id for task in tasks] == ["a1", "a2", "a3"]
+
+
+def test_echo_task_list_renders_text(capsys):
+    tasks = [
+        Task(id="abc12345", name="Read paper", flagged=True),
+        Task(id="def67890", name="Email advisor"),
+    ]
+
+    echo_task_list(tasks, "tasks", as_json=False)
+
+    assert capsys.readouterr().out == (
+        "2 tasks:\n"
+        "  abc12345  * Read paper\n"
+        "  def67890  Email advisor\n"
+    )
+
+
 def test_check_ambiguous_accepts_alias_errors(capsys):
     with pytest.raises(SystemExit):
         check_ambiguous(
@@ -388,6 +442,28 @@ def test_inbox_add_due_uses_local_date_constructor(monkeypatch):
     assert 'new Date("2026-03-15")' not in scripts[0]
 
 
+def test_inbox_lists_tasks(monkeypatch):
+    def fake_run_jxa(_script):
+        return [
+            {
+                "id": "abc12345xyz",
+                "name": "Read paper",
+                "flagged": True,
+                "completed": False,
+                "dueDate": None,
+                "note": None,
+                "tags": ["research"],
+            }
+        ]
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["inbox"])
+
+    assert result.exit_code == 0
+    assert result.output == "1 inbox tasks:\n  abc12345  * Read paper #research\n"
+
+
 def test_update_due_uses_local_date_constructor(monkeypatch):
     scripts = []
 
@@ -490,6 +566,43 @@ def test_tasks_due_before_uses_local_dates_in_json(monkeypatch):
         "  }\n"
         "]"
     )
+
+
+def test_task_search_dedupes_inbox_and_active_results(monkeypatch):
+    def fake_run_jxa(script):
+        if script == JS_TASKS:
+            return [
+                {
+                    "id": "abc12345xyz",
+                    "name": "Read paper",
+                    "flagged": False,
+                    "completed": False,
+                    "dueDate": None,
+                    "note": "Review methods",
+                    "project": "Research",
+                    "tags": [],
+                }
+            ]
+        if script == JS_INBOX:
+            return [
+                {
+                    "id": "abc12345xyz",
+                    "name": "Read paper",
+                    "flagged": False,
+                    "completed": False,
+                    "dueDate": None,
+                    "note": "Review methods",
+                    "tags": [],
+                }
+            ]
+        raise AssertionError(f"Unexpected script: {script}")
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["task", "search", "read"])
+
+    assert result.exit_code == 0
+    assert result.output == "1 matches:\n  abc12345  Read paper [Research]\n"
 
 
 def test_dump_accepts_json_flag(monkeypatch):

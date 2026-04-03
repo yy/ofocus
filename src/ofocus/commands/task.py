@@ -8,15 +8,16 @@ import click
 
 from ofocus import jxa
 from ofocus.helpers import (
+    echo_task_list,
     js_escape,
     jxa_local_date_constructor,
+    load_task_list,
+    load_unique_task_list,
     open_omnifocus_task,
-    run_jxa_or_exit,
     run_task_lookup_or_exit,
     validate_date,
     validate_task_id,
 )
-from ofocus.models import Task
 
 
 @click.group(invoke_without_command=True)
@@ -65,8 +66,7 @@ def task(ctx, project_filter, tag, flagged, due_before, as_json):
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def ls(project, tag, flagged, due_before, as_json):
     """List active tasks."""
-    raw = run_jxa_or_exit(jxa.JS_TASKS)
-    task_list = [Task.from_dict(d) for d in (raw or [])]
+    task_list = load_task_list(jxa.JS_TASKS)
     if project:
         task_list = [
             t for t in task_list if t.project and project.lower() in t.project.lower()
@@ -82,12 +82,7 @@ def ls(project, tag, flagged, due_before, as_json):
         task_list = [
             t for t in task_list if t.due_date and t.due_date[:10] <= due_before
         ]
-    if as_json:
-        click.echo(json.dumps([t.to_dict() for t in task_list], indent=2))
-    else:
-        click.echo(f"{len(task_list)} tasks:")
-        for t in task_list:
-            click.echo(f"  {t.id[:8]}  {t.to_line()}")
+    echo_task_list(task_list, "tasks", as_json)
 
 
 @task.command()
@@ -236,21 +231,9 @@ JSON.stringify({id: task.id(), name: task.name()});
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def search(query, as_json):
     """Search tasks by name (includes inbox and active tasks)."""
-    raw_tasks = run_jxa_or_exit(jxa.JS_TASKS)
-    raw_inbox = run_jxa_or_exit(jxa.JS_INBOX)
-    seen = set()
-    task_list = []
-    for d in (raw_tasks or []) + (raw_inbox or []):
-        if d["id"] not in seen:
-            seen.add(d["id"])
-            task_list.append(Task.from_dict(d))
+    task_list = load_unique_task_list(jxa.JS_TASKS, jxa.JS_INBOX)
     q = query.lower()
     matches = [
         t for t in task_list if q in t.name.lower() or (t.note and q in t.note.lower())
     ]
-    if as_json:
-        click.echo(json.dumps([t.to_dict() for t in matches], indent=2))
-    else:
-        click.echo(f"{len(matches)} matches:")
-        for t in matches:
-            click.echo(f"  {t.id[:8]}  {t.to_line()}")
+    echo_task_list(matches, "matches", as_json)

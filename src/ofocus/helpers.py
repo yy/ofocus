@@ -1,5 +1,6 @@
 """Shared CLI helpers: validators, formatters, tree utilities."""
 
+import json
 import re
 import sys
 from datetime import date
@@ -8,6 +9,7 @@ from typing import Any
 
 import click
 
+from ofocus.models import Task
 from ofocus.omni import OmniError
 
 # ── Validators ──────────────────────────────────────────────────────────
@@ -75,6 +77,36 @@ def run_jxa_or_exit(script: str) -> Any | None:
         return jxa.run_jxa(script)
     except OmniError as e:
         handle_error(e)
+
+
+def load_task_list(script: str) -> list[Task]:
+    """Run a task-list JXA script and parse the results into Task objects."""
+    raw = run_jxa_or_exit(script)
+    return [Task.from_dict(d) for d in (raw or [])]
+
+
+def load_unique_task_list(*scripts: str) -> list[Task]:
+    """Load tasks from multiple scripts, keeping only the first item per ID."""
+    seen: set[str] = set()
+    tasks = []
+    for script in scripts:
+        for task in load_task_list(script):
+            if task.id in seen:
+                continue
+            seen.add(task.id)
+            tasks.append(task)
+    return tasks
+
+
+def echo_task_list(tasks: list[Task], label: str, as_json: bool) -> None:
+    """Render a task collection using the CLI's standard text or JSON format."""
+    if as_json:
+        click.echo(json.dumps([task.to_dict() for task in tasks], indent=2))
+        return
+
+    click.echo(f"{len(tasks)} {label}:")
+    for task in tasks:
+        click.echo(f"  {task.id[:8]}  {task.to_line()}")
 
 
 def build_task_lookup_script(
