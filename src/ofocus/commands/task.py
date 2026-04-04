@@ -20,6 +20,37 @@ from ofocus.helpers import (
 )
 
 
+def _run_task_action(
+    task_id: str,
+    success_code: str,
+    *,
+    script_prefix: str = "",
+    aliases: dict[str, str] | None = None,
+) -> dict:
+    """Resolve a task ID/prefix and run an action script against the match."""
+    validate_task_id(task_id)
+    return run_task_lookup_or_exit(
+        task_id,
+        success_code,
+        script_prefix=script_prefix,
+        aliases=aliases,
+    )
+
+
+def _echo_task_action_result(
+    result: dict,
+    action: str,
+    task_id: str,
+    as_json: bool,
+) -> None:
+    """Render a standard task action response."""
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+        return
+
+    click.echo(f"{action}: {result.get('name', task_id)}")
+
+
 @click.group(invoke_without_command=True)
 @click.option(
     "--project",
@@ -90,18 +121,14 @@ def ls(project, tag, flagged, due_before, as_json):
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def complete(task_id, as_json):
     """Mark a task as complete."""
-    validate_task_id(task_id)
-    result = run_task_lookup_or_exit(
+    result = _run_task_action(
         task_id,
         """\
 app.markComplete(task);
 JSON.stringify({id: task.id(), name: task.name(), completed: true});
 """,
     )
-    if as_json:
-        click.echo(json.dumps(result, indent=2))
-    else:
-        click.echo(f"Completed: {result.get('name', task_id)}")
+    _echo_task_action_result(result, "Completed", task_id, as_json)
 
 
 @task.command()
@@ -114,7 +141,6 @@ JSON.stringify({id: task.id(), name: task.name(), completed: true});
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def update(task_id, name, due, flag, note, project, as_json):
     """Update a task."""
-    validate_task_id(task_id)
     updates = []
     script_prefix = ""
     if name is not None:
@@ -159,16 +185,13 @@ JSON.stringify({{
     flagged: task.flagged(),
     project: proj ? proj.name() : null
 }});"""
-    result = run_task_lookup_or_exit(
+    result = _run_task_action(
         task_id,
         success_code,
         script_prefix=script_prefix,
         aliases={"ambiguous_project": "projects"},
     )
-    if as_json:
-        click.echo(json.dumps(result, indent=2))
-    else:
-        click.echo(f"Updated: {result.get('name', task_id)}")
+    _echo_task_action_result(result, "Updated", task_id, as_json)
 
 
 @task.command()
@@ -176,18 +199,14 @@ JSON.stringify({{
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def drop(task_id, as_json):
     """Drop (mark as dropped) a task."""
-    validate_task_id(task_id)
-    result = run_task_lookup_or_exit(
+    result = _run_task_action(
         task_id,
         """\
 app.markDropped(task);
 JSON.stringify({id: task.id(), name: task.name(), dropped: true});
 """,
     )
-    if as_json:
-        click.echo(json.dumps(result, indent=2))
-    else:
-        click.echo(f"Dropped: {result.get('name', task_id)}")
+    _echo_task_action_result(result, "Dropped", task_id, as_json)
 
 
 @task.command()
@@ -195,8 +214,7 @@ JSON.stringify({id: task.id(), name: task.name(), dropped: true});
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def delete(task_id, as_json):
     """Delete a task permanently."""
-    validate_task_id(task_id)
-    result = run_task_lookup_or_exit(
+    result = _run_task_action(
         task_id,
         """\
 var name = task.name();
@@ -205,18 +223,14 @@ app.delete(task);
 JSON.stringify({id: id, name: name, deleted: true});
 """,
     )
-    if as_json:
-        click.echo(json.dumps(result, indent=2))
-    else:
-        click.echo(f"Deleted: {result.get('name', task_id)}")
+    _echo_task_action_result(result, "Deleted", task_id, as_json)
 
 
 @task.command("open")
 @click.argument("task_id")
 def open_task(task_id):
     """Open a task in OmniFocus."""
-    validate_task_id(task_id)
-    result = run_task_lookup_or_exit(
+    result = _run_task_action(
         task_id,
         """\
 JSON.stringify({id: task.id(), name: task.name()});
