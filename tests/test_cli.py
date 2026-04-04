@@ -26,7 +26,14 @@ from ofocus.helpers import (
     validate_date,
     validate_task_id,
 )
-from ofocus.jxa import JS_ACTION_TASK_HELPERS, JS_INBOX, JS_TASKS, run_jxa
+from ofocus.jxa import (
+    JS_ACTION_TASK_HELPERS,
+    JS_INBOX,
+    JS_SERIALIZE_FOLDER_CONTENTS,
+    JS_TASKS,
+    JS_TOP_LEVEL,
+    run_jxa,
+)
 from ofocus.models import Task
 from ofocus.omni import OmniError
 
@@ -171,6 +178,24 @@ def test_js_due_dates_use_local_date_strings():
     assert "toLocalDateString" in JS_TASKS
     assert "toISOString" not in JS_INBOX
     assert "toISOString" not in JS_TASKS
+
+
+def test_folder_contents_script_reuses_project_summary_helpers():
+    assert "function serializeFolderSummary(folder)" in JS_SERIALIZE_FOLDER_CONTENTS
+    assert "function serializeProjectSummary(project)" in JS_SERIALIZE_FOLDER_CONTENTS
+    assert "children.push(serializeFolderSummary(subfolders[i]));" in (
+        JS_SERIALIZE_FOLDER_CONTENTS
+    )
+    assert "children.push(serializeProjectSummary(projects[i]));" in (
+        JS_SERIALIZE_FOLDER_CONTENTS
+    )
+
+
+def test_top_level_script_reuses_project_summary_helpers():
+    assert "function serializeFolderSummary(folder)" in JS_TOP_LEVEL
+    assert "function serializeProjectSummary(project)" in JS_TOP_LEVEL
+    assert "result.push(serializeFolderSummary(folders[i]));" in JS_TOP_LEVEL
+    assert "result.push(serializeProjectSummary(topProjects[i]));" in JS_TOP_LEVEL
 
 
 def test_stats_excludes_dropped_from_active_and_overdue(monkeypatch):

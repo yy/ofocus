@@ -89,47 +89,66 @@ function findTaskById(doc, query) {
 }
 """
 
+JS_PROJECT_LIST_HELPERS = """\
+function getProjectStatus(project) {
+    try { return project.status(); } catch(e) { return "active"; }
+}
+
+function countRemainingTasks(project) {
+    return project.flattenedTasks().filter(function(t) {
+        return !t.completed() && !t.dropped();
+    }).length;
+}
+
+function countActiveProjects(projects) {
+    var activeCount = 0;
+    for (var i = 0; i < projects.length; i++) {
+        var status = getProjectStatus(projects[i]);
+        if (status === "active" || status === "active status") activeCount++;
+    }
+    return activeCount;
+}
+
+function serializeFolderSummary(folder) {
+    var projects = folder.projects();
+    return {
+        type: "folder",
+        id: folder.id(),
+        name: folder.name(),
+        projectCount: projects.length,
+        activeCount: countActiveProjects(projects)
+    };
+}
+
+function serializeProjectSummary(project) {
+    return {
+        type: "project",
+        id: project.id(),
+        name: project.name(),
+        status: getProjectStatus(project),
+        taskCount: countRemainingTasks(project)
+    };
+}
+"""
+
 # Reusable JXA: serialize a folder's subfolders and projects into a list.
-JS_SERIALIZE_FOLDER_CONTENTS = """\
+JS_SERIALIZE_FOLDER_CONTENTS = (
+    JS_PROJECT_LIST_HELPERS
+    + """\
 function serializeFolderContents(folder) {
     var children = [];
     var subfolders = folder.folders();
     for (var i = 0; i < subfolders.length; i++) {
-        var sf = subfolders[i];
-        var projects = sf.projects();
-        var activeCount = 0;
-        for (var j = 0; j < projects.length; j++) {
-            var s;
-            try { s = projects[j].status(); } catch(e) { s = "active"; }
-            if (s === "active" || s === "active status") activeCount++;
-        }
-        children.push({
-            type: "folder",
-            id: sf.id(),
-            name: sf.name(),
-            projectCount: projects.length,
-            activeCount: activeCount
-        });
+        children.push(serializeFolderSummary(subfolders[i]));
     }
     var projects = folder.projects();
     for (var i = 0; i < projects.length; i++) {
-        var p = projects[i];
-        var s;
-        try { s = p.status(); } catch(e) { s = "active"; }
-        var remaining = p.flattenedTasks().filter(function(t) {
-            return !t.completed() && !t.dropped();
-        }).length;
-        children.push({
-            type: "project",
-            id: p.id(),
-            name: p.name(),
-            status: s,
-            taskCount: remaining
-        });
+        children.push(serializeProjectSummary(projects[i]));
     }
     return children;
 }
 """
+)
 
 # ── Complete JS scripts ─────────────────────────────────────────────────
 
@@ -271,50 +290,27 @@ var folders = doc.flattenedFolders().map(function(f) {
 JSON.stringify(folders);
 """
 
-JS_TOP_LEVEL = """\
+JS_TOP_LEVEL = (
+    JS_PROJECT_LIST_HELPERS
+    + """\
 var doc = Application("OmniFocus").defaultDocument;
 var result = [];
 
 // Top-level folders
 var folders = doc.folders();
 for (var i = 0; i < folders.length; i++) {
-    var f = folders[i];
-    var projects = f.projects();
-    var activeCount = 0;
-    for (var j = 0; j < projects.length; j++) {
-        var s;
-        try { s = projects[j].status(); } catch(e) { s = "active"; }
-        if (s === "active" || s === "active status") activeCount++;
-    }
-    result.push({
-        type: "folder",
-        id: f.id(),
-        name: f.name(),
-        projectCount: projects.length,
-        activeCount: activeCount
-    });
+    result.push(serializeFolderSummary(folders[i]));
 }
 
 // Top-level projects (not in any folder)
 var topProjects = doc.projects();
 for (var i = 0; i < topProjects.length; i++) {
-    var p = topProjects[i];
-    var s;
-    try { s = p.status(); } catch(e) { s = "active"; }
-    var remaining = p.flattenedTasks().filter(function(t) {
-        return !t.completed() && !t.dropped();
-    }).length;
-    result.push({
-        type: "project",
-        id: p.id(),
-        name: p.name(),
-        status: s,
-        taskCount: remaining
-    });
+    result.push(serializeProjectSummary(topProjects[i]));
 }
 
 JSON.stringify(result);
 """
+)
 
 # ── JXA bridge ──────────────────────────────────────────────────────────
 
