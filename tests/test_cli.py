@@ -26,7 +26,7 @@ from ofocus.helpers import (
     validate_date,
     validate_task_id,
 )
-from ofocus.jxa import JS_INBOX, JS_TASKS, run_jxa
+from ofocus.jxa import JS_ACTION_TASK_HELPERS, JS_INBOX, JS_TASKS, run_jxa
 from ofocus.models import Task
 from ofocus.omni import OmniError
 
@@ -155,9 +155,14 @@ def test_js_tasks_excludes_dropped():
     assert "!t.dropped()" in JS_TASKS
 
 
+def test_action_task_helper_uses_parent_task_not_project_accessor():
+    assert "t.parentTask()" in JS_ACTION_TASK_HELPERS
+    assert "t.project()" not in JS_ACTION_TASK_HELPERS
+
+
 def test_js_tasks_excludes_project_roots_and_task_groups():
     assert "isIndividualAction" in JS_TASKS
-    assert "!t.project()" in JS_TASKS
+    assert "t.parentTask()" in JS_TASKS
     assert "t.tasks().length === 0" in JS_TASKS
 
 
@@ -189,7 +194,7 @@ def test_stats_excludes_dropped_from_active_and_overdue(monkeypatch):
     assert result.exit_code == 0
     assert len(scripts) == 1
     assert "isIndividualAction" in scripts[0]
-    assert "!t.project()" in scripts[0]
+    assert "t.parentTask()" in scripts[0]
     assert "t.tasks().length === 0" in scripts[0]
     assert "!t.dropped()" in scripts[0]
     assert "t.completed() || t.dropped()" in scripts[0]
