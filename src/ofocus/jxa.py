@@ -20,8 +20,8 @@ function toLocalDateString(d) {
 
 JS_ACTION_TASK_HELPERS = """\
 function isIndividualAction(t) {
-    var parent = t.parentTask();
-    return parent && t.tasks().length === 0;
+    var project = t.containingProject();
+    return project && t.tasks().length === 0;
 }
 """
 

@@ -162,14 +162,16 @@ def test_js_tasks_excludes_dropped():
     assert "!t.dropped()" in JS_TASKS
 
 
-def test_action_task_helper_uses_parent_task_not_project_accessor():
-    assert "t.parentTask()" in JS_ACTION_TASK_HELPERS
+def test_action_task_helper_includes_top_level_project_actions():
+    assert "t.containingProject()" in JS_ACTION_TASK_HELPERS
+    assert "t.tasks().length === 0" in JS_ACTION_TASK_HELPERS
     assert "t.project()" not in JS_ACTION_TASK_HELPERS
+    assert "t.parentTask()" not in JS_ACTION_TASK_HELPERS
 
 
-def test_js_tasks_excludes_project_roots_and_task_groups():
+def test_js_tasks_includes_top_level_project_actions_and_excludes_task_groups():
     assert "isIndividualAction" in JS_TASKS
-    assert "t.parentTask()" in JS_TASKS
+    assert "t.containingProject()" in JS_TASKS
     assert "t.tasks().length === 0" in JS_TASKS
 
 
@@ -219,7 +221,7 @@ def test_stats_excludes_dropped_from_active_and_overdue(monkeypatch):
     assert result.exit_code == 0
     assert len(scripts) == 1
     assert "isIndividualAction" in scripts[0]
-    assert "t.parentTask()" in scripts[0]
+    assert "t.containingProject()" in scripts[0]
     assert "t.tasks().length === 0" in scripts[0]
     assert "!t.dropped()" in scripts[0]
     assert "t.completed() || t.dropped()" in scripts[0]
@@ -352,9 +354,7 @@ def test_echo_task_list_renders_text(capsys):
     echo_task_list(tasks, "tasks", as_json=False)
 
     assert capsys.readouterr().out == (
-        "2 tasks:\n"
-        "  abc12345  * Read paper\n"
-        "  def67890  Email advisor\n"
+        "2 tasks:\n  abc12345  * Read paper\n  def67890  Email advisor\n"
     )
 
 
