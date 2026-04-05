@@ -136,6 +136,37 @@ if (lookup.error) {{
     )
 
 
+def build_fuzzy_lookup_script(
+    query: str,
+    collection_expr: str,
+    success_code: str,
+    *,
+    item_var: str = "item",
+    not_found_error: str,
+    script_prefix: str = "",
+) -> str:
+    """Build a JXA script that fuzzy-matches an item and runs success code."""
+    from ofocus import jxa
+
+    return (
+        script_prefix
+        + jxa.JS_FUZZY_MATCH
+        + f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var lookup = fuzzyMatch({collection_expr}, "{js_escape(query)}");
+if (lookup.error === "not_found") {{
+    JSON.stringify({{error: "{js_escape(not_found_error)}"}});
+}} else if (lookup.error) {{
+    JSON.stringify(lookup);
+}} else {{
+    var {item_var} = lookup.match;
+{indent(success_code.rstrip(), "    ")}
+}}
+"""
+    )
+
+
 def check_ambiguous(
     result: dict | None,
     item_type: str = "items",
@@ -185,8 +216,8 @@ def run_task_lookup_or_exit(
     return result or {}
 
 
-def open_omnifocus_task(item_id: str) -> None:
-    """Open an OmniFocus task by ID via the app URL scheme."""
+def open_omnifocus_item(item_id: str) -> None:
+    """Open an OmniFocus item by ID via the app URL scheme."""
     import subprocess
 
     try:

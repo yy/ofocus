@@ -9,6 +9,7 @@ import click
 from ofocus import jxa
 from ofocus.helpers import (
     annotate_types,
+    build_fuzzy_lookup_script,
     check_ambiguous,
     check_result_error,
     collect_first_available,
@@ -18,7 +19,7 @@ from ofocus.helpers import (
     format_task_line,
     js_escape,
     mark_availability,
-    open_omnifocus_task,
+    open_omnifocus_item,
     print_ls_items,
     print_tree,
     run_jxa_or_exit,
@@ -174,24 +175,19 @@ def show(project, show_all, available, first_available, as_json):
 @click.argument("project")
 def open_project(project):
     """Open a project in OmniFocus."""
-    script = (
-        jxa.JS_FUZZY_MATCH
-        + f"""\
-var doc = Application("OmniFocus").defaultDocument;
-var lookup = fuzzyMatch(doc.flattenedProjects(), "{js_escape(project)}");
-if (lookup.error === "not_found") {{
-    JSON.stringify({{error: "Project not found"}});
-}} else if (lookup.error) {{
-    JSON.stringify(lookup);
-}} else {{
-    JSON.stringify({{id: lookup.match.id(), name: lookup.match.name()}});
-}}
-"""
+    script = build_fuzzy_lookup_script(
+        project,
+        "doc.flattenedProjects()",
+        """\
+JSON.stringify({id: item.id(), name: item.name()});
+""",
+        item_var="item",
+        not_found_error="Project not found",
     )
     result = run_jxa_or_exit(script)
     check_ambiguous(result, "projects")
     check_result_error(result)
-    open_omnifocus_task(result["id"])
+    open_omnifocus_item(result["id"])
     click.echo(f"Opened: {result['name']}")
 
 
@@ -202,26 +198,20 @@ if (lookup.error === "not_found") {{
 def create(name, folder, as_json):
     """Create a new project."""
     if folder:
-        script = (
-            jxa.JS_FUZZY_MATCH
-            + f"""\
-var app = Application("OmniFocus");
-var doc = app.defaultDocument;
-var lookup = fuzzyMatch(doc.flattenedFolders(), "{js_escape(folder)}");
-if (lookup.error === "not_found") {{
-    JSON.stringify({{error: "Folder not found: {js_escape(folder)}"}});
-}} else if (lookup.error) {{
-    JSON.stringify(lookup);
-}} else {{
-    var proj = app.Project({{name: "{js_escape(name)}"}});
-    lookup.match.projects.push(proj);
-    JSON.stringify({{
-        id: proj.id(),
-        name: proj.name(),
-        folder: lookup.match.name()
-    }});
-}}
-"""
+        script = build_fuzzy_lookup_script(
+            folder,
+            "doc.flattenedFolders()",
+            f"""\
+var proj = app.Project({{name: "{js_escape(name)}"}});
+item.projects.push(proj);
+JSON.stringify({{
+    id: proj.id(),
+    name: proj.name(),
+    folder: item.name()
+}});
+""",
+            item_var="item",
+            not_found_error=f"Folder not found: {folder}",
         )
     else:
         script = f"""\

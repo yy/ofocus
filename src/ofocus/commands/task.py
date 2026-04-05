@@ -13,7 +13,7 @@ from ofocus.helpers import (
     jxa_local_date_constructor,
     load_task_list,
     load_unique_task_list,
-    open_omnifocus_task,
+    open_omnifocus_item,
     run_task_lookup_or_exit,
     validate_date,
     validate_task_id,
@@ -236,7 +236,7 @@ def open_task(task_id):
 JSON.stringify({id: task.id(), name: task.name()});
 """,
     )
-    open_omnifocus_task(result["id"])
+    open_omnifocus_item(result["id"])
     click.echo(f"Opened: {result['name']}")
 
 

@@ -9,6 +9,7 @@ from ofocus import __version__
 from ofocus.cli import cli
 from ofocus.helpers import (
     annotate_types,
+    build_fuzzy_lookup_script,
     check_ambiguous,
     collect_first_available,
     count_tasks,
@@ -92,6 +93,23 @@ def test_js_escape_paragraph_separator():
 def test_js_escape_combined():
     result = js_escape("a\\b\"c'd`e$f\ng")
     assert result == "a\\\\b\\\"c\\'d\\`e\\$f\\ng"
+
+
+def test_build_fuzzy_lookup_script_reuses_fuzzy_match_and_customizes_not_found():
+    script = build_fuzzy_lookup_script(
+        'Personal "Projects"',
+        "doc.flattenedProjects()",
+        """\
+JSON.stringify({id: item.id(), name: item.name()});
+""",
+        item_var="item",
+        not_found_error='Project not found: "Personal"',
+    )
+
+    assert "function fuzzyMatch(items, query)" in script
+    assert 'fuzzyMatch(doc.flattenedProjects(), "Personal \\"Projects\\"")' in script
+    assert 'JSON.stringify({error: "Project not found: \\"Personal\\""})' in script
+    assert "var item = lookup.match;" in script
 
 
 # ── validate_date ──────────────────────────────────────────────────────
@@ -462,6 +480,27 @@ def test_open_commands_fail_when_open_url_fails(monkeypatch, argv):
     assert result.exit_code == 1
     assert "failed to open OmniFocus URL" in result.output
     assert "Opened:" not in result.output
+
+
+def test_project_open_uses_shared_fuzzy_lookup_script(monkeypatch):
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        return {"id": "proj12345XYZ", "name": "Paper writing"}
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: None)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "open", "Paper"])
+
+    assert result.exit_code == 0
+    assert len(scripts) == 1
+    assert "function fuzzyMatch(items, query)" in scripts[0]
+    assert 'fuzzyMatch(doc.flattenedProjects(), "Paper")' in scripts[0]
+    assert 'JSON.stringify({error: "Project not found"});' in scripts[0]
+    assert "var item = lookup.match;" in scripts[0]
+    assert 'JSON.stringify({id: item.id(), name: item.name()});' in scripts[0]
 
 
 def test_inbox_add_due_uses_local_date_constructor(monkeypatch):
@@ -1477,6 +1516,29 @@ def test_project_create_ambiguous_folder(monkeypatch):
     )
     assert result.exit_code == 1
     assert "Multiple folders match" in result.output
+
+
+def test_project_create_folder_uses_shared_fuzzy_lookup_script(monkeypatch):
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        return {"id": "p1", "name": "Test Project", "folder": "Work"}
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["project", "create", "Test Project", "--folder", "Work"]
+    )
+
+    assert result.exit_code == 0
+    assert len(scripts) == 1
+    assert "function fuzzyMatch(items, query)" in scripts[0]
+    assert 'fuzzyMatch(doc.flattenedFolders(), "Work")' in scripts[0]
+    assert 'JSON.stringify({error: "Folder not found: Work"});' in scripts[0]
+    assert "var item = lookup.match;" in scripts[0]
+    assert 'var proj = app.Project({name: "Test Project"});' in scripts[0]
+    assert "item.projects.push(proj);" in scripts[0]
 
 
 # ── Availability helpers ──────────────────────────────────────────────
