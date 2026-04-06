@@ -10,6 +10,7 @@ from ofocus.cli import cli
 from ofocus.helpers import (
     annotate_types,
     build_fuzzy_lookup_script,
+    build_task_lookup_script,
     check_ambiguous,
     collect_first_available,
     count_tasks,
@@ -29,6 +30,7 @@ from ofocus.helpers import (
 )
 from ofocus.jxa import (
     JS_ACTION_TASK_HELPERS,
+    JS_FIND_TASK_BY_ID,
     JS_INBOX,
     JS_SERIALIZE_FOLDER_CONTENTS,
     JS_TASKS,
@@ -110,6 +112,21 @@ JSON.stringify({id: item.id(), name: item.name()});
     assert 'fuzzyMatch(doc.flattenedProjects, "Personal \\"Projects\\"")' in script
     assert 'JSON.stringify({error: "Project not found: \\"Personal\\""})' in script
     assert "var item = lookup.match;" in script
+
+
+def test_build_task_lookup_script_uses_global_scalar_prefix_scan():
+    script = build_task_lookup_script(
+        "abc12345",
+        """\
+JSON.stringify({id: task.id(), name: task.name()});
+""",
+    )
+
+    assert "function serializeTaskMatches(ids, names)" in script
+    assert "var ids = doc.flattenedTasks.id();" in script
+    assert "var names = doc.flattenedTasks.name();" in script
+    assert "var inbox = doc.inboxTasks();" not in script
+    assert "doc.flattenedTasks.whose({id: prefixIds[0]})();" in script
 
 
 # ── validate_date ──────────────────────────────────────────────────────
@@ -427,6 +444,8 @@ def test_task_mutation_commands_support_prefix_lookup(monkeypatch, argv, fake_re
     assert result.exit_code == 0
     assert len(scripts) == 1
     assert "indexOf(query) === 0" in scripts[0]
+    assert "doc.flattenedTasks.id()" in scripts[0]
+    assert "doc.inboxTasks()" not in scripts[0]
 
 
 def test_task_complete_honors_group_level_json_shorthand(monkeypatch):

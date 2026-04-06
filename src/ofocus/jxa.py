@@ -72,13 +72,22 @@ function fuzzyMatch(collection, query) {
 """
 
 # Reusable JXA function: resolve a task by exact ID or unique ID prefix.
-# Uses a tiered strategy to avoid scanning the full task database:
+# Uses a tiered strategy to keep common lookups fast without changing
+# global prefix semantics:
 #   1. .whose({id: query}) — native server-side exact-ID lookup (instant)
-#   2. doc.inboxTasks() prefix scan — small collection (~100-200 items)
-#   3. doc.flattenedTasks() prefix scan — last resort for non-inbox tasks
+#   2. doc.flattenedTasks.id()/name() — global prefix scan over scalar values
+#   3. doc.flattenedTasks() — full object scan as a compatibility fallback
 # Returns {match: task} on unique match, {error: "ambiguous", matches: [...]}
 # on multiple, or {error: "Task not found"} on none.
 JS_FIND_TASK_BY_ID = """\
+function serializeTaskMatches(ids, names) {
+    var matches = [];
+    for (var i = 0; i < ids.length; i++) {
+        matches.push({id: ids[i], name: names[i]});
+    }
+    return matches;
+}
+
 function findTaskById(doc, query) {
     var i;
     // Tier 1: exact ID via native .whose() — server-side, near-instant
@@ -87,19 +96,28 @@ function findTaskById(doc, query) {
         if (exact.length === 1) return {match: exact[0]};
     } catch(e) { /* fall through */ }
 
-    // Tier 2: scan inbox by prefix — typically ~100-200 items
-    var inbox = doc.inboxTasks();
-    var prefixes = [];
-    for (i = 0; i < inbox.length; i++) {
-        if (inbox[i].id().indexOf(query) === 0) prefixes.push(inbox[i]);
-    }
-    if (prefixes.length === 1) return {match: prefixes[0]};
-    if (prefixes.length > 1) return {
-        error: "ambiguous",
-        matches: prefixes.map(function(t) { return {id: t.id(), name: t.name()}; })
-    };
+    // Tier 2: scan global task IDs/names without materializing task objects
+    try {
+        var ids = doc.flattenedTasks.id();
+        var names = doc.flattenedTasks.name();
+        var prefixIds = [];
+        var prefixNames = [];
+        for (i = 0; i < ids.length; i++) {
+            if (ids[i].indexOf(query) === 0) {
+                prefixIds.push(ids[i]);
+                prefixNames.push(names[i]);
+            }
+        }
+        if (prefixIds.length === 0) return {error: "Task not found"};
+        if (prefixIds.length > 1) return {
+            error: "ambiguous",
+            matches: serializeTaskMatches(prefixIds, prefixNames)
+        };
+        var unique = doc.flattenedTasks.whose({id: prefixIds[0]})();
+        if (unique.length === 1) return {match: unique[0]};
+    } catch(e) { /* fall through to full object scan */ }
 
-    // Tier 3: full scan — last resort for prefix matches outside inbox
+    // Tier 3: full scan — compatibility fallback if scalar lookup is unsupported
     var all = doc.flattenedTasks();
     var matches = [];
     for (i = 0; i < all.length; i++) {
