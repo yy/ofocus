@@ -41,7 +41,7 @@ Key JXA patterns:
 
 ### Shared JXA helpers
 
-- `JS_FUZZY_MATCH` — reusable `fuzzyMatch(items, query)` function: exact ID → ID prefix → name substring
+- `JS_FUZZY_MATCH` — reusable `fuzzyMatch(collection, query)` function: `collection` is a JXA specifier (not pre-resolved). Tries `.whose({id})` first, then: exact ID → ID prefix → name substring
 - `JS_SERIALIZE_FOLDER_CONTENTS` — reusable `serializeFolderContents(folder)` for listing subfolders + projects
 - `JS_LOCAL_DATE_HELPERS` — `toLocalDateString()` for date formatting
 

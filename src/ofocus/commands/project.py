@@ -55,7 +55,7 @@ var query = "{js_escape(folder)}";
 
 {jxa.JS_SERIALIZE_FOLDER_CONTENTS}
 
-var folderLookup = fuzzyMatch(doc.flattenedFolders(), query);
+var folderLookup = fuzzyMatch(doc.flattenedFolders, query);
 var result;
 
 if (folderLookup.match) {{
@@ -67,7 +67,7 @@ if (folderLookup.match) {{
     result = folderLookup;
 }} else {{
     // No folder found — try matching a project
-    var projLookup = fuzzyMatch(doc.flattenedProjects(), query);
+    var projLookup = fuzzyMatch(doc.flattenedProjects, query);
     if (projLookup.match) {{
         result = {{
             error: "is_project",
@@ -179,7 +179,7 @@ def open_project(project):
     """Open a project in OmniFocus."""
     script = build_fuzzy_lookup_script(
         project,
-        "doc.flattenedProjects()",
+        "doc.flattenedProjects",
         """\
 JSON.stringify({id: item.id(), name: item.name()});
 """,
@@ -202,7 +202,7 @@ def create(name, folder, as_json):
     if folder:
         script = build_fuzzy_lookup_script(
             folder,
-            "doc.flattenedFolders()",
+            "doc.flattenedFolders",
             f"""\
 var proj = app.Project({{name: "{js_escape(name)}"}});
 item.projects.push(proj);

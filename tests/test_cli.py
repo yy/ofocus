@@ -98,7 +98,7 @@ def test_js_escape_combined():
 def test_build_fuzzy_lookup_script_reuses_fuzzy_match_and_customizes_not_found():
     script = build_fuzzy_lookup_script(
         'Personal "Projects"',
-        "doc.flattenedProjects()",
+        "doc.flattenedProjects",
         """\
 JSON.stringify({id: item.id(), name: item.name()});
 """,
@@ -106,8 +106,8 @@ JSON.stringify({id: item.id(), name: item.name()});
         not_found_error='Project not found: "Personal"',
     )
 
-    assert "function fuzzyMatch(items, query)" in script
-    assert 'fuzzyMatch(doc.flattenedProjects(), "Personal \\"Projects\\"")' in script
+    assert "function fuzzyMatch(collection, query)" in script
+    assert 'fuzzyMatch(doc.flattenedProjects, "Personal \\"Projects\\"")' in script
     assert 'JSON.stringify({error: "Project not found: \\"Personal\\""})' in script
     assert "var item = lookup.match;" in script
 
@@ -439,11 +439,7 @@ def test_task_complete_honors_group_level_json_shorthand(monkeypatch):
 
     assert result.exit_code == 0
     assert result.output.strip() == (
-        "{\n"
-        '  "id": "abc12345XYZ",\n'
-        '  "name": "Read paper",\n'
-        '  "completed": true\n'
-        "}"
+        '{\n  "id": "abc12345XYZ",\n  "name": "Read paper",\n  "completed": true\n}'
     )
 
 
@@ -522,11 +518,11 @@ def test_project_open_uses_shared_fuzzy_lookup_script(monkeypatch):
 
     assert result.exit_code == 0
     assert len(scripts) == 1
-    assert "function fuzzyMatch(items, query)" in scripts[0]
-    assert 'fuzzyMatch(doc.flattenedProjects(), "Paper")' in scripts[0]
+    assert "function fuzzyMatch(collection, query)" in scripts[0]
+    assert 'fuzzyMatch(doc.flattenedProjects, "Paper")' in scripts[0]
     assert 'JSON.stringify({error: "Project not found"});' in scripts[0]
     assert "var item = lookup.match;" in scripts[0]
-    assert 'JSON.stringify({id: item.id(), name: item.name()});' in scripts[0]
+    assert "JSON.stringify({id: item.id(), name: item.name()});" in scripts[0]
 
 
 def test_project_show_honors_group_level_json_shorthand(monkeypatch):
@@ -584,10 +580,7 @@ def test_inbox_add_honors_group_level_json_shorthand(monkeypatch):
 
     assert result.exit_code == 0
     assert result.output.strip() == (
-        "{\n"
-        '  "id": "abc12345",\n'
-        '  "name": "Read paper"\n'
-        "}"
+        '{\n  "id": "abc12345",\n  "name": "Read paper"\n}'
     )
 
 
@@ -643,8 +636,7 @@ def test_update_project_uses_prefix_lookup(monkeypatch):
 
     assert result.exit_code == 0
     assert len(scripts) == 1
-    assert 'fuzzyMatch(doc.flattenedProjects(), "proj1234")' in scripts[0]
-    assert "doc.flattenedProjects.whose({id:" not in scripts[0]
+    assert 'fuzzyMatch(doc.flattenedProjects, "proj1234")' in scripts[0]
 
 
 def test_update_project_accepts_project_name_lookup(monkeypatch):
@@ -667,7 +659,7 @@ def test_update_project_accepts_project_name_lookup(monkeypatch):
 
     assert result.exit_code == 0
     assert len(scripts) == 1
-    assert 'fuzzyMatch(doc.flattenedProjects(), "Paper writing")' in scripts[0]
+    assert 'fuzzyMatch(doc.flattenedProjects, "Paper writing")' in scripts[0]
     assert "Updated: Read paper" in result.output
 
 
@@ -1604,8 +1596,8 @@ def test_project_create_folder_uses_shared_fuzzy_lookup_script(monkeypatch):
 
     assert result.exit_code == 0
     assert len(scripts) == 1
-    assert "function fuzzyMatch(items, query)" in scripts[0]
-    assert 'fuzzyMatch(doc.flattenedFolders(), "Work")' in scripts[0]
+    assert "function fuzzyMatch(collection, query)" in scripts[0]
+    assert 'fuzzyMatch(doc.flattenedFolders, "Work")' in scripts[0]
     assert 'JSON.stringify({error: "Folder not found: Work"});' in scripts[0]
     assert "var item = lookup.match;" in scripts[0]
     assert 'var proj = app.Project({name: "Test Project"});' in scripts[0]

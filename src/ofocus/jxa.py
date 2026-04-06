@@ -25,13 +25,24 @@ function isIndividualAction(t) {
 }
 """
 
-# Reusable JXA function: fuzzy-match an item from a list by ID or name.
+# Reusable JXA function: fuzzy-match an item from a collection by ID or name.
+# `collection` is a JXA specifier (not pre-resolved array) — e.g.
+# doc.flattenedProjects, NOT doc.flattenedProjects().
+# Uses .whose() for instant server-side exact-ID lookup before falling back
+# to linear scan for prefix/name matching.
 # Returns {match: item} on unique match, {error: "ambiguous", matches: [...]}
 # on multiple, or {error: "not_found"} on none.
 JS_FUZZY_MATCH = """\
-function fuzzyMatch(items, query) {
+function fuzzyMatch(collection, query) {
     var i;
-    // Exact ID
+    // Exact ID via native .whose() — server-side, near-instant
+    try {
+        var exact = collection.whose({id: query})();
+        if (exact.length === 1) return {match: exact[0]};
+    } catch(e) { /* fall through to linear scan */ }
+    // Resolve full collection for prefix and name matching
+    var items = collection();
+    // Exact ID (fallback if .whose() failed)
     for (i = 0; i < items.length; i++) {
         if (items[i].id() === query) return {match: items[i]};
     }
@@ -61,30 +72,44 @@ function fuzzyMatch(items, query) {
 """
 
 # Reusable JXA function: resolve a task by exact ID or unique ID prefix.
+# Uses a tiered strategy to avoid scanning the full task database:
+#   1. .whose({id: query}) — native server-side exact-ID lookup (instant)
+#   2. doc.inboxTasks() prefix scan — small collection (~100-200 items)
+#   3. doc.flattenedTasks() prefix scan — last resort for non-inbox tasks
 # Returns {match: task} on unique match, {error: "ambiguous", matches: [...]}
 # on multiple, or {error: "Task not found"} on none.
 JS_FIND_TASK_BY_ID = """\
 function findTaskById(doc, query) {
+    var i;
+    // Tier 1: exact ID via native .whose() — server-side, near-instant
+    try {
+        var exact = doc.flattenedTasks.whose({id: query})();
+        if (exact.length === 1) return {match: exact[0]};
+    } catch(e) { /* fall through */ }
+
+    // Tier 2: scan inbox by prefix — typically ~100-200 items
+    var inbox = doc.inboxTasks();
+    var prefixes = [];
+    for (i = 0; i < inbox.length; i++) {
+        if (inbox[i].id().indexOf(query) === 0) prefixes.push(inbox[i]);
+    }
+    if (prefixes.length === 1) return {match: prefixes[0]};
+    if (prefixes.length > 1) return {
+        error: "ambiguous",
+        matches: prefixes.map(function(t) { return {id: t.id(), name: t.name()}; })
+    };
+
+    // Tier 3: full scan — last resort for prefix matches outside inbox
     var all = doc.flattenedTasks();
-    var matches = all.filter(function(t) {
-        return t.id() === query;
-    });
-    if (matches.length === 0) {
-        matches = all.filter(function(t) {
-            return t.id().indexOf(query) === 0;
-        });
+    var matches = [];
+    for (i = 0; i < all.length; i++) {
+        if (all[i].id().indexOf(query) === 0) matches.push(all[i]);
     }
-    if (matches.length === 0) {
-        return {error: "Task not found"};
-    }
-    if (matches.length > 1) {
-        return {
-            error: "ambiguous",
-            matches: matches.map(function(t) {
-                return {id: t.id(), name: t.name()};
-            })
-        };
-    }
+    if (matches.length === 0) return {error: "Task not found"};
+    if (matches.length > 1) return {
+        error: "ambiguous",
+        matches: matches.map(function(t) { return {id: t.id(), name: t.name()}; })
+    };
     return {match: matches[0]};
 }
 """
@@ -255,7 +280,7 @@ function serializeTask(t) {
     };
 }
 
-var lookup = fuzzyMatch(doc.flattenedProjects(), "__QUERY__");
+var lookup = fuzzyMatch(doc.flattenedProjects, "__QUERY__");
 var result;
 if (lookup.error === "not_found") {
     result = {error: "Project not found"};

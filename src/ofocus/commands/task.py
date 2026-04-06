@@ -188,7 +188,7 @@ def update(task_id, name, due, flag, note, project, as_json):
     if project is not None:
         apply_updates = f"{indent(update_code, '    ')}\n" if update_code else ""
         success_code = f"""\
-var projLookup = fuzzyMatch(doc.flattenedProjects(), "{js_escape(project)}");
+var projLookup = fuzzyMatch(doc.flattenedProjects, "{js_escape(project)}");
 if (projLookup.error === "not_found") {{
     JSON.stringify({{error: "Project not found"}});
 }} else if (projLookup.error === "ambiguous") {{
