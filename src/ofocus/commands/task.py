@@ -74,7 +74,9 @@ def task(ctx, project_filter, tag, flagged, due_before, as_json):
             due_before=due_before,
             as_json=as_json,
         )
-    elif ctx.invoked_subcommand == "ls":
+        return
+
+    if ctx.invoked_subcommand == "ls":
         ctx.default_map = ctx.default_map or {}
         ls_defaults = ctx.default_map.setdefault("ls", {})
         if project_filter is not None:
@@ -87,6 +89,32 @@ def task(ctx, project_filter, tag, flagged, due_before, as_json):
             ls_defaults["due_before"] = due_before
         if as_json:
             ls_defaults["as_json"] = as_json
+        return
+
+    misused_filters = []
+    if project_filter is not None:
+        misused_filters.append("--project")
+    if tag is not None:
+        misused_filters.append("--tag")
+    if flagged:
+        misused_filters.append("--flagged")
+    if due_before is not None:
+        misused_filters.append("--due-before")
+    if misused_filters:
+        options = ", ".join(misused_filters)
+        raise click.UsageError(
+            f"{options} can only be used with `ofocus task ls` or bare `ofocus task`."
+        )
+
+    if as_json and ctx.invoked_subcommand in {
+        "complete",
+        "update",
+        "drop",
+        "delete",
+        "search",
+    }:
+        ctx.default_map = ctx.default_map or {}
+        ctx.default_map.setdefault(ctx.invoked_subcommand, {})["as_json"] = True
 
 
 @task.command("ls")

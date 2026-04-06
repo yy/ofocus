@@ -19,6 +19,11 @@ from ofocus.helpers import (
 @click.pass_context
 def inbox(ctx, as_json):
     """List or manage inbox tasks."""
+    if ctx.invoked_subcommand == "add" and as_json:
+        ctx.default_map = ctx.default_map or {}
+        ctx.default_map.setdefault("add", {})["as_json"] = as_json
+        return
+
     if ctx.invoked_subcommand is not None:
         return
     tasks = load_task_list(jxa.JS_INBOX)

@@ -34,9 +34,11 @@ def project(ctx, as_json):
     """Manage projects."""
     if ctx.invoked_subcommand is None:
         ctx.invoke(ls, folder=None, as_json=as_json)
-    elif ctx.invoked_subcommand == "ls" and as_json:
+        return
+
+    if as_json and ctx.invoked_subcommand in {"ls", "show", "create"}:
         ctx.default_map = ctx.default_map or {}
-        ctx.default_map.setdefault("ls", {})["as_json"] = as_json
+        ctx.default_map.setdefault(ctx.invoked_subcommand, {})["as_json"] = as_json
 
 
 @project.command("ls")

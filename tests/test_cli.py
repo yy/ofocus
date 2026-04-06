@@ -429,6 +429,32 @@ def test_task_mutation_commands_support_prefix_lookup(monkeypatch, argv, fake_re
     assert "indexOf(query) === 0" in scripts[0]
 
 
+def test_task_complete_honors_group_level_json_shorthand(monkeypatch):
+    def fake_run_jxa(_script):
+        return {"id": "abc12345XYZ", "name": "Read paper", "completed": True}
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["task", "--json", "complete", "abc12345"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == (
+        "{\n"
+        '  "id": "abc12345XYZ",\n'
+        '  "name": "Read paper",\n'
+        '  "completed": true\n'
+        "}"
+    )
+
+
+def test_task_rejects_ls_only_filters_before_non_ls_subcommands():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["task", "--project", "Work", "complete", "abc12345"])
+
+    assert result.exit_code == 2
+    assert "--project can only be used with `ofocus task ls`" in result.output
+
+
 @pytest.mark.parametrize(
     "argv",
     [
@@ -503,6 +529,34 @@ def test_project_open_uses_shared_fuzzy_lookup_script(monkeypatch):
     assert 'JSON.stringify({id: item.id(), name: item.name()});' in scripts[0]
 
 
+def test_project_show_honors_group_level_json_shorthand(monkeypatch):
+    def fake_run_jxa(_script):
+        return {
+            "id": "proj12345XYZ",
+            "name": "Paper writing",
+            "status": "active",
+            "note": "",
+            "children": [],
+        }
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "--json", "show", "Paper"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == (
+        "{\n"
+        '  "id": "proj12345XYZ",\n'
+        '  "name": "Paper writing",\n'
+        '  "status": "active",\n'
+        '  "note": "",\n'
+        '  "children": [],\n'
+        '  "remaining": 0,\n'
+        '  "total": 0\n'
+        "}"
+    )
+
+
 def test_inbox_add_due_uses_local_date_constructor(monkeypatch):
     scripts = []
 
@@ -518,6 +572,23 @@ def test_inbox_add_due_uses_local_date_constructor(monkeypatch):
     assert len(scripts) == 1
     assert "task.dueDate = new Date(2026, 2, 15);" in scripts[0]
     assert 'new Date("2026-03-15")' not in scripts[0]
+
+
+def test_inbox_add_honors_group_level_json_shorthand(monkeypatch):
+    def fake_run_jxa(_script):
+        return {"id": "abc12345", "name": "Read paper"}
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["inbox", "--json", "add", "Read paper"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == (
+        "{\n"
+        '  "id": "abc12345",\n'
+        '  "name": "Read paper"\n'
+        "}"
+    )
 
 
 def test_inbox_lists_tasks(monkeypatch):
