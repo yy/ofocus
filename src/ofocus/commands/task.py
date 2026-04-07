@@ -1,6 +1,5 @@
 """Task subcommand group."""
 
-import json
 import sys
 from textwrap import indent
 
@@ -8,6 +7,7 @@ import click
 
 from ofocus import jxa
 from ofocus.helpers import (
+    echo_action_result,
     echo_task_list,
     js_escape,
     jxa_local_date_constructor,
@@ -15,6 +15,7 @@ from ofocus.helpers import (
     load_unique_task_list,
     open_omnifocus_item,
     run_task_lookup_or_exit,
+    set_subcommand_defaults,
     validate_date,
     validate_task_id,
 )
@@ -35,20 +36,6 @@ def _run_task_action(
         script_prefix=script_prefix,
         aliases=aliases,
     )
-
-
-def _echo_task_action_result(
-    result: dict,
-    action: str,
-    task_id: str,
-    as_json: bool,
-) -> None:
-    """Render a standard task action response."""
-    if as_json:
-        click.echo(json.dumps(result, indent=2))
-        return
-
-    click.echo(f"{action}: {result.get('name', task_id)}")
 
 
 @click.group(invoke_without_command=True)
@@ -77,18 +64,15 @@ def task(ctx, project_filter, tag, flagged, due_before, as_json):
         return
 
     if ctx.invoked_subcommand == "ls":
-        ctx.default_map = ctx.default_map or {}
-        ls_defaults = ctx.default_map.setdefault("ls", {})
-        if project_filter is not None:
-            ls_defaults["project"] = project_filter
-        if tag is not None:
-            ls_defaults["tag"] = tag
-        if flagged:
-            ls_defaults["flagged"] = flagged
-        if due_before is not None:
-            ls_defaults["due_before"] = due_before
-        if as_json:
-            ls_defaults["as_json"] = as_json
+        set_subcommand_defaults(
+            ctx,
+            "ls",
+            project=project_filter,
+            tag=tag,
+            flagged=flagged,
+            due_before=due_before,
+            as_json=as_json,
+        )
         return
 
     misused_filters = []
@@ -113,8 +97,7 @@ def task(ctx, project_filter, tag, flagged, due_before, as_json):
         "delete",
         "search",
     }:
-        ctx.default_map = ctx.default_map or {}
-        ctx.default_map.setdefault(ctx.invoked_subcommand, {})["as_json"] = True
+        set_subcommand_defaults(ctx, ctx.invoked_subcommand, as_json=True)
 
 
 @task.command("ls")
@@ -156,7 +139,7 @@ app.markComplete(task);
 JSON.stringify({id: task.id(), name: task.name(), completed: true});
 """,
     )
-    _echo_task_action_result(result, "Completed", task_id, as_json)
+    echo_action_result(result, "Completed", as_json=as_json, fallback_name=task_id)
 
 
 @task.command()
@@ -219,7 +202,7 @@ JSON.stringify({{
         script_prefix=script_prefix,
         aliases={"ambiguous_project": "projects"},
     )
-    _echo_task_action_result(result, "Updated", task_id, as_json)
+    echo_action_result(result, "Updated", as_json=as_json, fallback_name=task_id)
 
 
 @task.command()
@@ -234,7 +217,7 @@ app.markDropped(task);
 JSON.stringify({id: task.id(), name: task.name(), dropped: true});
 """,
     )
-    _echo_task_action_result(result, "Dropped", task_id, as_json)
+    echo_action_result(result, "Dropped", as_json=as_json, fallback_name=task_id)
 
 
 @task.command()
@@ -251,7 +234,7 @@ app.delete(task);
 JSON.stringify({id: id, name: name, deleted: true});
 """,
     )
-    _echo_task_action_result(result, "Deleted", task_id, as_json)
+    echo_action_result(result, "Deleted", as_json=as_json, fallback_name=task_id)
 
 
 @task.command("open")
@@ -265,7 +248,7 @@ JSON.stringify({id: task.id(), name: task.name()});
 """,
     )
     open_omnifocus_item(result["id"])
-    click.echo(f"Opened: {result['name']}")
+    echo_action_result(result, "Opened", as_json=False, fallback_name=task_id)
 
 
 @task.command()

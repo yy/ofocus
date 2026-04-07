@@ -1,16 +1,16 @@
 """Inbox subcommand group."""
 
-import json
-
 import click
 
 from ofocus import jxa
 from ofocus.helpers import (
+    echo_action_result,
     echo_task_list,
     js_escape,
     jxa_local_date_constructor,
     load_task_list,
     run_jxa_or_exit,
+    set_subcommand_defaults,
 )
 
 
@@ -20,8 +20,7 @@ from ofocus.helpers import (
 def inbox(ctx, as_json):
     """List or manage inbox tasks."""
     if ctx.invoked_subcommand == "add" and as_json:
-        ctx.default_map = ctx.default_map or {}
-        ctx.default_map.setdefault("add", {})["as_json"] = as_json
+        set_subcommand_defaults(ctx, "add", as_json=as_json)
         return
 
     if ctx.invoked_subcommand is not None:
@@ -53,7 +52,10 @@ doc.inboxTasks.push(task);
     script += "JSON.stringify({id: task.id(), name: task.name()});"
 
     result = run_jxa_or_exit(script)
-    if as_json:
-        click.echo(json.dumps(result, indent=2))
-    else:
-        click.echo(f"Added: {result.get('name', name)} ({result.get('id', '?')[:8]})")
+    echo_action_result(
+        result,
+        "Added",
+        as_json=as_json,
+        fallback_name=name,
+        include_id=True,
+    )

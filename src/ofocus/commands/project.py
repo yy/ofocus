@@ -14,6 +14,7 @@ from ofocus.helpers import (
     check_result_error,
     collect_first_available,
     count_tasks,
+    echo_action_result,
     filter_available,
     filter_tree,
     format_task_line,
@@ -23,6 +24,7 @@ from ofocus.helpers import (
     print_ls_items,
     print_tree,
     run_jxa_or_exit,
+    set_subcommand_defaults,
     strip_internal_fields,
 )
 
@@ -37,8 +39,7 @@ def project(ctx, as_json):
         return
 
     if as_json and ctx.invoked_subcommand in {"ls", "show", "create"}:
-        ctx.default_map = ctx.default_map or {}
-        ctx.default_map.setdefault(ctx.invoked_subcommand, {})["as_json"] = as_json
+        set_subcommand_defaults(ctx, ctx.invoked_subcommand, as_json=as_json)
 
 
 @project.command("ls")
@@ -190,7 +191,7 @@ JSON.stringify({id: item.id(), name: item.name()});
     check_ambiguous(result, "projects")
     check_result_error(result)
     open_omnifocus_item(result["id"])
-    click.echo(f"Opened: {result['name']}")
+    echo_action_result(result, "Opened", as_json=False, fallback_name=project)
 
 
 @project.command()
@@ -226,9 +227,10 @@ JSON.stringify({{id: proj.id(), name: proj.name()}});
     result = run_jxa_or_exit(script)
     check_ambiguous(result, "folders")
     check_result_error(result)
-    if as_json:
-        click.echo(json.dumps(result, indent=2))
-    else:
-        click.echo(
-            f"Created project: {result.get('name', name)} ({result.get('id', '?')[:8]})"
-        )
+    echo_action_result(
+        result,
+        "Created project",
+        as_json=as_json,
+        fallback_name=name,
+        include_id=True,
+    )

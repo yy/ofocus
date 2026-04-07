@@ -109,6 +109,43 @@ def echo_task_list(tasks: list[Task], label: str, as_json: bool) -> None:
         click.echo(f"  {task.id[:8]}  {task.to_line()}")
 
 
+def set_subcommand_defaults(
+    ctx: click.Context, subcommand: str, **defaults: Any
+) -> None:
+    """Merge non-empty defaults into Click's default_map for a subcommand."""
+    filtered_defaults = {
+        key: value
+        for key, value in defaults.items()
+        if value is not None and value is not False
+    }
+    if not filtered_defaults:
+        return
+
+    ctx.default_map = ctx.default_map or {}
+    ctx.default_map.setdefault(subcommand, {}).update(filtered_defaults)
+
+
+def echo_action_result(
+    result: dict[str, Any],
+    action: str,
+    *,
+    as_json: bool,
+    fallback_name: str | None = None,
+    include_id: bool = False,
+) -> None:
+    """Render a single-item command result using the standard text/JSON formats."""
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+        return
+
+    name = result.get("name", fallback_name or "?")
+    if include_id:
+        click.echo(f"{action}: {name} ({result.get('id', '?')[:8]})")
+        return
+
+    click.echo(f"{action}: {name}")
+
+
 def build_task_lookup_script(
     task_id: str,
     success_code: str,

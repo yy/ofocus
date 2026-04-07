@@ -5,7 +5,7 @@ import json
 import click
 
 from ofocus import jxa
-from ofocus.helpers import run_jxa_or_exit
+from ofocus.helpers import run_jxa_or_exit, set_subcommand_defaults
 from ofocus.models import Tag
 
 
@@ -17,8 +17,7 @@ def tag(ctx, as_json):
     if ctx.invoked_subcommand is None:
         ctx.invoke(ls, as_json=as_json)
     elif ctx.invoked_subcommand == "ls" and as_json:
-        ctx.default_map = ctx.default_map or {}
-        ctx.default_map.setdefault("ls", {})["as_json"] = as_json
+        set_subcommand_defaults(ctx, "ls", as_json=as_json)
 
 
 @tag.command("ls")

@@ -1,6 +1,7 @@
 """Unit tests for CLI — no OmniFocus needed."""
 
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 from click.testing import CliRunner
@@ -14,6 +15,7 @@ from ofocus.helpers import (
     check_ambiguous,
     collect_first_available,
     count_tasks,
+    echo_action_result,
     echo_task_list,
     filter_available,
     filter_tree,
@@ -25,12 +27,12 @@ from ofocus.helpers import (
     mark_availability,
     print_tree,
     run_jxa_or_exit,
+    set_subcommand_defaults,
     validate_date,
     validate_task_id,
 )
 from ofocus.jxa import (
     JS_ACTION_TASK_HELPERS,
-    JS_FIND_TASK_BY_ID,
     JS_INBOX,
     JS_SERIALIZE_FOLDER_CONTENTS,
     JS_TASKS,
@@ -391,6 +393,34 @@ def test_echo_task_list_renders_text(capsys):
     assert capsys.readouterr().out == (
         "2 tasks:\n  abc12345  * Read paper\n  def67890  Email advisor\n"
     )
+
+
+def test_set_subcommand_defaults_merges_only_explicit_values():
+    ctx = SimpleNamespace(default_map={"ls": {"tag": "research"}})
+
+    set_subcommand_defaults(
+        ctx,
+        "ls",
+        project="Work",
+        tag=None,
+        flagged=False,
+        as_json=True,
+    )
+
+    assert ctx.default_map == {
+        "ls": {"tag": "research", "project": "Work", "as_json": True}
+    }
+
+
+def test_echo_action_result_renders_short_id_when_requested(capsys):
+    echo_action_result(
+        {"id": "abc12345xyz", "name": "Read paper"},
+        "Added",
+        as_json=False,
+        include_id=True,
+    )
+
+    assert capsys.readouterr().out == "Added: Read paper (abc12345)\n"
 
 
 def test_check_ambiguous_accepts_alias_errors(capsys):
