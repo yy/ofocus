@@ -150,6 +150,7 @@ def show(project, show_all, available, first_available, as_json):
             first_tasks = collect_first_available(result["children"])
             if as_json:
                 strip_internal_fields(first_tasks)
+                annotate_types(first_tasks)
                 click.echo(json.dumps(first_tasks, indent=2))
             else:
                 if not first_tasks:
