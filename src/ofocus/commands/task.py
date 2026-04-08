@@ -7,10 +7,10 @@ import click
 
 from ofocus import jxa
 from ofocus.helpers import (
+    build_task_field_assignments,
     echo_action_result,
     echo_task_list,
     js_escape,
-    jxa_local_date_constructor,
     load_task_list,
     load_unique_task_list,
     open_omnifocus_item,
@@ -152,16 +152,13 @@ JSON.stringify({id: task.id(), name: task.name(), completed: true});
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def update(task_id, name, due, flag, note, project, as_json):
     """Update a task."""
-    updates = []
+    updates = build_task_field_assignments(
+        name=name,
+        due=due,
+        flag=flag,
+        note=note,
+    )
     script_prefix = ""
-    if name is not None:
-        updates.append(f'task.name = "{js_escape(name)}";')
-    if due is not None:
-        updates.append(f"task.dueDate = {jxa_local_date_constructor(due)};")
-    if flag is not None:
-        updates.append(f"task.flagged = {'true' if flag else 'false'};")
-    if note is not None:
-        updates.append(f'task.note = "{js_escape(note)}";')
     if project is not None:
         script_prefix = jxa.JS_FUZZY_MATCH
     if not updates and project is None:

@@ -4,10 +4,10 @@ import click
 
 from ofocus import jxa
 from ofocus.helpers import (
+    build_task_field_assignments,
     echo_action_result,
     echo_task_list,
     js_escape,
-    jxa_local_date_constructor,
     load_task_list,
     run_jxa_or_exit,
     set_subcommand_defaults,
@@ -37,18 +37,21 @@ def inbox(ctx, as_json):
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def inbox_add(name, note, due, flag, as_json):
     """Add a task to the inbox."""
+    assignments = build_task_field_assignments(
+        note=note if note else None,
+        due=due if due else None,
+        flag=True if flag else None,
+    )
+    assignment_block = "\n".join(assignments)
+
     script = f"""\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
 var task = app.InboxTask({{name: "{js_escape(name)}"}});
 doc.inboxTasks.push(task);
 """
-    if note:
-        script += f'task.note = "{js_escape(note)}";\n'
-    if flag:
-        script += "task.flagged = true;\n"
-    if due:
-        script += f"task.dueDate = {jxa_local_date_constructor(due)};\n"
+    if assignment_block:
+        script += assignment_block + "\n"
     script += "JSON.stringify({id: task.id(), name: task.name()});"
 
     result = run_jxa_or_exit(script)

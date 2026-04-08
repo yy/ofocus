@@ -61,6 +61,29 @@ def jxa_local_date_constructor(value: str) -> str:
     return f"new Date({parsed.year}, {parsed.month - 1}, {parsed.day})"
 
 
+def build_task_field_assignments(
+    *,
+    target: str = "task",
+    name: str | None = None,
+    due: str | None = None,
+    flag: bool | None = None,
+    note: str | None = None,
+) -> list[str]:
+    """Build JXA assignment statements for common task fields."""
+    assignments = []
+    if name is not None:
+        assignments.append(f'{target}.name = "{js_escape(name)}";')
+    if due is not None:
+        assignments.append(
+            f"{target}.dueDate = {jxa_local_date_constructor(due)};"
+        )
+    if flag is not None:
+        assignments.append(f"{target}.flagged = {'true' if flag else 'false'};")
+    if note is not None:
+        assignments.append(f'{target}.note = "{js_escape(note)}";')
+    return assignments
+
+
 # ── Error handling ──────────────────────────────────────────────────────
 
 

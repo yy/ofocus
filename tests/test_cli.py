@@ -11,6 +11,7 @@ from ofocus.cli import cli
 from ofocus.helpers import (
     annotate_types,
     build_fuzzy_lookup_script,
+    build_task_field_assignments,
     build_task_lookup_script,
     check_ambiguous,
     collect_first_available,
@@ -160,6 +161,20 @@ def test_validate_date_rejects_impossible_date():
 
 def test_jxa_local_date_constructor_uses_local_components():
     assert jxa_local_date_constructor("2026-03-15") == "new Date(2026, 2, 15)"
+
+
+def test_build_task_field_assignments_formats_common_mutations():
+    assert build_task_field_assignments(
+        name='Review "draft"',
+        due="2026-03-15",
+        flag=False,
+        note="Line 1\nLine 2",
+    ) == [
+        'task.name = "Review \\"draft\\"";',
+        "task.dueDate = new Date(2026, 2, 15);",
+        "task.flagged = false;",
+        'task.note = "Line 1\\nLine 2";',
+    ]
 
 
 # ── validate_task_id ───────────────────────────────────────────────────
