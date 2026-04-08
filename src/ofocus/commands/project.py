@@ -147,7 +147,9 @@ def show(project, show_all, available, first_available, as_json):
         today = date.today().isoformat()
         mark_availability(result["children"], result.get("sequential", False), today)
         if first_available:
-            first_tasks = collect_first_available(result["children"])
+            first_tasks = collect_first_available(
+                result["children"], parent_sequential=result.get("sequential", False)
+            )
             if as_json:
                 strip_internal_fields(first_tasks)
                 annotate_types(first_tasks)

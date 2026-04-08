@@ -332,18 +332,24 @@ def filter_available(children: list[dict]) -> list[dict]:
     return filtered
 
 
-def collect_first_available(children: list[dict]) -> list[dict]:
-    """Collect leaf tasks that are the first available action(s)."""
+def collect_first_available(
+    children: list[dict], parent_sequential: bool = False
+) -> list[dict]:
+    """Collect first available leaf tasks, respecting sequential parents."""
     results = []
     for node in children:
         if not node.get("_available"):
             continue
         kids = node.get("children", [])
         if kids:
-            results.extend(collect_first_available(kids))
+            results.extend(
+                collect_first_available(
+                    kids, parent_sequential=node.get("sequential", False)
+                )
+            )
         else:
             results.append(node)
-        if results:
+        if parent_sequential and results:
             break
     return results
 

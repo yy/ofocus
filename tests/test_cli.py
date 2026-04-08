@@ -1744,8 +1744,7 @@ def test_collect_first_available_parallel():
     ]
     mark_availability(children, parent_sequential=False, today="2026-03-20")
     first = collect_first_available(children)
-    assert len(first) == 1
-    assert first[0]["name"] == "A"
+    assert [task["name"] for task in first] == ["A", "B"]
 
 
 def test_collect_first_available_nested_sequential():
@@ -1762,8 +1761,7 @@ def test_collect_first_available_nested_sequential():
     ]
     mark_availability(children, parent_sequential=False, today="2026-03-20")
     first = collect_first_available(children)
-    assert len(first) == 1
-    assert first[0]["name"] == "G1"
+    assert [task["name"] for task in first] == ["G1", "Standalone"]
 
 
 def test_show_available_flag(monkeypatch):
@@ -1863,3 +1861,27 @@ def test_show_first_flag(monkeypatch):
     assert "first available" in result.output
     assert "First" in result.output
     assert "Second" not in result.output
+
+
+def test_show_first_flag_lists_all_parallel_first_available_tasks(monkeypatch):
+    def fake_run_jxa(_script):
+        return {
+            "id": "proj1",
+            "name": "Parallel Project",
+            "status": "active",
+            "note": "",
+            "sequential": False,
+            "children": [
+                _make_task("First"),
+                _make_task("Second"),
+            ],
+        }
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "show", "proj1", "--first"])
+
+    assert result.exit_code == 0
+    assert "first available" in result.output
+    assert "First" in result.output
+    assert "Second" in result.output
