@@ -276,12 +276,12 @@ def run_task_lookup_or_exit(
     return result or {}
 
 
-def open_omnifocus_item(item_id: str) -> None:
-    """Open an OmniFocus item by ID via the app URL scheme."""
+def open_omnifocus_item(item_id: str, *, item_type: str = "task") -> None:
+    """Open an OmniFocus task or project by ID via the app URL scheme."""
     import subprocess
 
     try:
-        subprocess.run(["open", f"omnifocus:///task/{item_id}"], check=True)
+        subprocess.run(["open", f"omnifocus:///{item_type}/{item_id}"], check=True)
     except subprocess.CalledProcessError as e:
         click.echo(f"Error: failed to open OmniFocus URL: {e}", err=True)
         sys.exit(1)

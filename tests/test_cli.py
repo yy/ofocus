@@ -589,6 +589,37 @@ def test_project_open_uses_shared_fuzzy_lookup_script(monkeypatch):
     assert "JSON.stringify({id: item.id(), name: item.name()});" in scripts[0]
 
 
+@pytest.mark.parametrize(
+    ("argv", "expected_url"),
+    [
+        (["task", "open", "abc12345"], "omnifocus:///task/abc12345XYZ"),
+        (["project", "open", "proj1234"], "omnifocus:///project/proj12345XYZ"),
+    ],
+)
+def test_open_commands_use_type_specific_omnifocus_urls(
+    monkeypatch, argv, expected_url
+):
+    open_calls = []
+
+    def fake_run_jxa(_script):
+        if argv[0] == "task":
+            return {"id": "abc12345XYZ", "name": "Read paper"}
+        return {"id": "proj12345XYZ", "name": "Paper writing"}
+
+    def fake_run(cmd, check=False, **_kwargs):
+        open_calls.append((cmd, check))
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    monkeypatch.setattr("subprocess.run", fake_run)
+    runner = CliRunner()
+    result = runner.invoke(cli, argv)
+
+    assert result.exit_code == 0
+    assert open_calls == [(["open", expected_url], True)]
+    assert "Opened:" in result.output
+
+
 def test_project_show_honors_group_level_json_shorthand(monkeypatch):
     def fake_run_jxa(_script):
         return {

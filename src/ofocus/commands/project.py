@@ -193,7 +193,7 @@ JSON.stringify({id: item.id(), name: item.name()});
     result = run_jxa_or_exit(script)
     check_ambiguous(result, "projects")
     check_result_error(result)
-    open_omnifocus_item(result["id"])
+    open_omnifocus_item(result["id"], item_type="project")
     echo_action_result(result, "Opened", as_json=False, fallback_name=project)
 
 
