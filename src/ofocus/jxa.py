@@ -1,10 +1,8 @@
 """JXA bridge and JavaScript snippet constants."""
 
-import json
-import subprocess
 from typing import Any
 
-from ofocus.omni import OmniError
+from ofocus.bridge import run_osascript_json
 
 # ── JS snippet building blocks ──────────────────────────────────────────
 
@@ -368,25 +366,8 @@ delay(0.2);
 def run_jxa(script: str) -> Any | None:
     """Run a JXA (not OmniAutomation) script and parse JSON result."""
     full_script = JXA_APP_PREAMBLE + script
-    try:
-        result = subprocess.run(
-            ["osascript", "-l", "JavaScript", "-e", full_script],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=JXA_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired as e:
-        raise OmniError(
-            f"JXA error: command timed out after {JXA_TIMEOUT_SECONDS} seconds"
-        ) from e
-    except subprocess.CalledProcessError as e:
-        raise OmniError(f"JXA error: {e.stderr.strip() or e.stdout.strip()}") from e
-
-    stdout = result.stdout.strip()
-    if not stdout:
-        raise OmniError("JXA error: empty output from osascript")
-    try:
-        return json.loads(stdout)
-    except json.JSONDecodeError:
-        raise OmniError(f"Failed to parse JXA output: {stdout!r}")
+    return run_osascript_json(
+        full_script,
+        timeout_seconds=JXA_TIMEOUT_SECONDS,
+        error_prefix="JXA",
+    )
