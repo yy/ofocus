@@ -17,6 +17,12 @@ class Tag:
     def to_line(self) -> str:
         return self.name
 
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+        }
+
 
 @dataclass
 class Task:
@@ -124,3 +130,10 @@ class Folder:
 
     def to_line(self) -> str:
         return f"{self.name} ({self.project_count} projects)"
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "projectCount": self.project_count,
+        }

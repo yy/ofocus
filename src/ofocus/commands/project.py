@@ -147,11 +147,7 @@ def show(project, show_all, available, first_available, as_json):
     )
 
     if first_available:
-        if as_json:
-            strip_internal_fields(children)
-            annotate_types(children)
-            click.echo(json.dumps(children, indent=2))
-        else:
+        if not as_json:
             if not children:
                 click.echo(f"{result['name']}  — no available tasks")
             else:
@@ -159,7 +155,7 @@ def show(project, show_all, available, first_available, as_json):
                 for task_node in children:
                     line = format_task_line(task_node)
                     click.echo(f"  {task_node['id'][:8]}  {line}")
-        return
+            return
 
     if as_json:
         response = dict(result)

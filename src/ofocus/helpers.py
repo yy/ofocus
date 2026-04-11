@@ -6,12 +6,22 @@ import sys
 from copy import deepcopy
 from datetime import date
 from textwrap import indent
-from typing import Any
+from typing import Any, Protocol, Sequence
 
 import click
 
 from ofocus.models import Task
 from ofocus.omni import OmniError
+
+
+class RenderableItem(Protocol):
+    """Minimal protocol for model objects rendered by list commands."""
+
+    id: str
+
+    def to_dict(self) -> dict[str, Any]: ...
+
+    def to_line(self) -> str: ...
 
 # ── Validators ──────────────────────────────────────────────────────────
 
@@ -122,15 +132,20 @@ def load_unique_task_list(*scripts: str) -> list[Task]:
     return tasks
 
 
-def echo_task_list(tasks: list[Task], label: str, as_json: bool) -> None:
-    """Render a task collection using the CLI's standard text or JSON format."""
+def echo_item_list(items: Sequence[RenderableItem], label: str, as_json: bool) -> None:
+    """Render a model collection using the CLI's standard text or JSON format."""
     if as_json:
-        click.echo(json.dumps([task.to_dict() for task in tasks], indent=2))
+        click.echo(json.dumps([item.to_dict() for item in items], indent=2))
         return
 
-    click.echo(f"{len(tasks)} {label}:")
-    for task in tasks:
-        click.echo(f"  {task.id[:8]}  {task.to_line()}")
+    click.echo(f"{len(items)} {label}:")
+    for item in items:
+        click.echo(f"  {item.id[:8]}  {item.to_line()}")
+
+
+def echo_task_list(tasks: list[Task], label: str, as_json: bool) -> None:
+    """Render a task collection using the CLI's standard text or JSON format."""
+    echo_item_list(tasks, label, as_json)
 
 
 def set_subcommand_defaults(

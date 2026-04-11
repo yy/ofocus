@@ -1886,9 +1886,12 @@ def test_show_first_json_omits_internal_availability_field(monkeypatch):
     import json
 
     data = json.loads(result.output)
-    assert data[0]["name"] == "First"
-    assert "_available" not in data[0]
-    assert data[0]["type"] == "task"
+    assert data["name"] == "Seq Project"
+    assert data["remaining"] == 1
+    assert data["total"] == 1
+    assert data["children"][0]["name"] == "First"
+    assert "_available" not in data["children"][0]
+    assert data["children"][0]["type"] == "task"
 
 
 def test_show_first_flag(monkeypatch):

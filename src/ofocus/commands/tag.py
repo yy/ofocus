@@ -1,11 +1,9 @@
 """Tag subcommand group."""
 
-import json
-
 import click
 
 from ofocus import jxa
-from ofocus.helpers import run_jxa_or_exit, set_subcommand_defaults
+from ofocus.helpers import echo_item_list, run_jxa_or_exit, set_subcommand_defaults
 from ofocus.models import Tag
 
 
@@ -26,11 +24,4 @@ def ls(as_json):
     """List all tags."""
     raw = run_jxa_or_exit(jxa.JS_TAGS)
     tag_list = [Tag.from_dict(d) for d in (raw or [])]
-    if as_json:
-        click.echo(
-            json.dumps([{"id": t.id, "name": t.name} for t in tag_list], indent=2)
-        )
-    else:
-        click.echo(f"{len(tag_list)} tags:")
-        for t in tag_list:
-            click.echo(f"  {t.id[:8]}  {t.name}")
+    echo_item_list(tag_list, "tags", as_json)

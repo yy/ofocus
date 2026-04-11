@@ -68,7 +68,17 @@ def test_tag_from_dict():
     assert t.name == "urgent"
 
 
+def test_tag_to_dict():
+    t = Tag(id="t1", name="urgent")
+    assert t.to_dict() == {"id": "t1", "name": "urgent"}
+
+
 def test_folder_from_dict():
     f = Folder.from_dict({"id": "f1", "name": "Personal", "projectCount": 3})
     assert f.project_count == 3
     assert "3 projects" in f.to_line()
+
+
+def test_folder_to_dict():
+    f = Folder(id="f1", name="Personal", project_count=3)
+    assert f.to_dict() == {"id": "f1", "name": "Personal", "projectCount": 3}
