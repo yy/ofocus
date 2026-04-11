@@ -210,8 +210,12 @@ def test_cli_version_matches_package_version():
     assert __version__ in result.output
 
 
-def test_js_tasks_excludes_dropped():
-    assert "!t.dropped()" in JS_TASKS
+def test_js_tasks_uses_scalar_field_arrays_for_speed():
+    assert "doc.flattenedTasks.id()" in JS_TASKS
+    assert "doc.flattenedTasks.containingProject.name()" in JS_TASKS
+    assert "doc.flattenedTasks.tasks()" in JS_TASKS
+    assert "doc.flattenedTasks.tags.name()" in JS_TASKS
+    assert "doc.flattenedTasks().filter" not in JS_TASKS
 
 
 def test_action_task_helper_includes_top_level_project_actions():
@@ -221,10 +225,10 @@ def test_action_task_helper_includes_top_level_project_actions():
     assert "t.parentTask()" not in JS_ACTION_TASK_HELPERS
 
 
-def test_js_tasks_includes_top_level_project_actions_and_excludes_task_groups():
-    assert "isIndividualAction" in JS_TASKS
-    assert "t.containingProject()" in JS_TASKS
-    assert "t.tasks().length === 0" in JS_TASKS
+def test_js_tasks_filters_project_actions_and_excludes_task_groups():
+    assert "!projectNames[i]" in JS_TASKS
+    assert "childTasks[i].length !== 0" in JS_TASKS
+    assert "completed[i] || dropped[i]" in JS_TASKS
 
 
 def test_js_due_dates_use_local_date_strings():
@@ -272,11 +276,12 @@ def test_stats_excludes_dropped_from_active_and_overdue(monkeypatch):
 
     assert result.exit_code == 0
     assert len(scripts) == 1
-    assert "isIndividualAction" in scripts[0]
-    assert "t.containingProject()" in scripts[0]
-    assert "t.tasks().length === 0" in scripts[0]
-    assert "!t.dropped()" in scripts[0]
-    assert "t.completed() || t.dropped()" in scripts[0]
+    assert "doc.flattenedTasks.completed()" in scripts[0]
+    assert "doc.flattenedTasks.containingProject.name()" in scripts[0]
+    assert "doc.flattenedTasks.tasks()" in scripts[0]
+    assert "childTasks[i].length === 0" in scripts[0]
+    assert "completed[i] || dropped[i]" in scripts[0]
+    assert "doc.flattenedTasks().filter" not in scripts[0]
 
 
 def test_stats_overdue_uses_local_calendar_dates(monkeypatch):

@@ -35,31 +35,33 @@ def stats(as_json):
     """Show quick counts."""
     script = (
         jxa.JS_LOCAL_DATE_HELPERS
-        + jxa.JS_ACTION_TASK_HELPERS
         + """\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
-var inbox = doc.inboxTasks().length;
-var active = doc.flattenedTasks().filter(function(t) {
-    return isIndividualAction(t) && !t.completed() && !t.dropped();
-}).length;
-var projects = doc.flattenedProjects().length;
-var tags = doc.flattenedTags().length;
-var flagged = doc.flattenedTasks().filter(function(t) {
-    return isIndividualAction(t) && t.flagged() && !t.completed() && !t.dropped();
-}).length;
+var completed = doc.flattenedTasks.completed();
+var dropped = doc.flattenedTasks.dropped();
+var flagged = doc.flattenedTasks.flagged();
+var dueDates = doc.flattenedTasks.dueDate();
+var projectNames = doc.flattenedTasks.containingProject.name();
+var childTasks = doc.flattenedTasks.tasks();
 var today = toLocalDateString(new Date());
-var overdue = doc.flattenedTasks().filter(function(t) {
-    if (!isIndividualAction(t) || t.completed() || t.dropped()) return false;
-    var d = t.dueDate();
-    return d && toLocalDateString(d) < today;
-}).length;
+var active = 0;
+var flaggedCount = 0;
+var overdue = 0;
+for (var i = 0; i < completed.length; i++) {
+    var isAction = !!projectNames[i] && childTasks[i].length === 0;
+    if (!isAction || completed[i] || dropped[i]) continue;
+    active++;
+    if (flagged[i]) flaggedCount++;
+    var d = dueDates[i];
+    if (d && toLocalDateString(d) < today) overdue++;
+}
 JSON.stringify({
-    inbox: inbox,
+    inbox: doc.inboxTasks().length,
     active: active,
-    projects: projects,
-    tags: tags,
-    flagged: flagged,
+    projects: doc.flattenedProjects().length,
+    tags: doc.flattenedTags().length,
+    flagged: flaggedCount,
     overdue: overdue
 });
 """

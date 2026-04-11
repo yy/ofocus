@@ -3,6 +3,7 @@
 import json
 import re
 import sys
+from copy import deepcopy
 from datetime import date
 from textwrap import indent
 from typing import Any
@@ -315,6 +316,37 @@ def print_ls_items(items: list[dict]):
 
 
 # ── Tree helpers ────────────────────────────────────────────────────────
+
+
+def prepare_project_children(
+    children: list[dict],
+    *,
+    parent_sequential: bool,
+    show_all: bool,
+    available_only: bool,
+    first_available_only: bool,
+    today: str | None = None,
+) -> list[dict]:
+    """Prepare a project tree for display without mutating the source payload."""
+    prepared = deepcopy(children)
+
+    if not show_all:
+        prepared = filter_tree(prepared)
+
+    if not (available_only or first_available_only):
+        return prepared
+
+    mark_availability(
+        prepared,
+        parent_sequential=parent_sequential,
+        today=today or date.today().isoformat(),
+    )
+    if first_available_only:
+        return collect_first_available(
+            prepared,
+            parent_sequential=parent_sequential,
+        )
+    return filter_available(prepared)
 
 
 def mark_availability(children: list[dict], parent_sequential: bool, today: str):

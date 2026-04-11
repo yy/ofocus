@@ -221,25 +221,34 @@ JS_TASKS = (
     """\
 """
     + JS_LOCAL_DATE_HELPERS
-    + JS_ACTION_TASK_HELPERS
     + """\
 var doc = Application("OmniFocus").defaultDocument;
-var tasks = doc.flattenedTasks().filter(function(t) {
-    return isIndividualAction(t) && !t.completed() && !t.dropped();
-}).map(function(t) {
-    var tags = t.tags().map(function(tg) { return tg.name(); });
-    var proj = t.containingProject();
-    return {
-        id: t.id(),
-        name: t.name(),
-        flagged: t.flagged(),
+var ids = doc.flattenedTasks.id();
+var names = doc.flattenedTasks.name();
+var flagged = doc.flattenedTasks.flagged();
+var completed = doc.flattenedTasks.completed();
+var dropped = doc.flattenedTasks.dropped();
+var dueDates = doc.flattenedTasks.dueDate();
+var notes = doc.flattenedTasks.note();
+var projectNames = doc.flattenedTasks.containingProject.name();
+var childTasks = doc.flattenedTasks.tasks();
+var tagNames = doc.flattenedTasks.tags.name();
+var tasks = [];
+for (var i = 0; i < ids.length; i++) {
+    if (!projectNames[i] || childTasks[i].length !== 0 || completed[i] || dropped[i]) {
+        continue;
+    }
+    tasks.push({
+        id: ids[i],
+        name: names[i],
+        flagged: flagged[i],
         completed: false,
-        dueDate: toLocalDateString(t.dueDate()),
-        note: t.note(),
-        project: proj ? proj.name() : null,
-        tags: tags
-    };
-});
+        dueDate: toLocalDateString(dueDates[i]),
+        note: notes[i],
+        project: projectNames[i],
+        tags: tagNames[i] || []
+    });
+}
 JSON.stringify(tasks);
 """
 )

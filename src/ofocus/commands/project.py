@@ -12,15 +12,12 @@ from ofocus.helpers import (
     build_fuzzy_lookup_script,
     check_ambiguous,
     check_result_error,
-    collect_first_available,
     count_tasks,
     echo_action_result,
-    filter_available,
-    filter_tree,
     format_task_line,
     js_escape,
-    mark_availability,
     open_omnifocus_item,
+    prepare_project_children,
     print_ls_items,
     print_tree,
     run_jxa_or_exit,
@@ -140,41 +137,43 @@ def show(project, show_all, available, first_available, as_json):
     check_ambiguous(result, "projects")
     check_result_error(result)
 
-    if not show_all:
-        result["children"] = filter_tree(result["children"])
+    children = prepare_project_children(
+        result["children"],
+        parent_sequential=result.get("sequential", False),
+        show_all=show_all,
+        available_only=available,
+        first_available_only=first_available,
+        today=date.today().isoformat(),
+    )
 
-    if available or first_available:
-        today = date.today().isoformat()
-        mark_availability(result["children"], result.get("sequential", False), today)
-        if first_available:
-            first_tasks = collect_first_available(
-                result["children"], parent_sequential=result.get("sequential", False)
-            )
-            if as_json:
-                strip_internal_fields(first_tasks)
-                annotate_types(first_tasks)
-                click.echo(json.dumps(first_tasks, indent=2))
+    if first_available:
+        if as_json:
+            strip_internal_fields(children)
+            annotate_types(children)
+            click.echo(json.dumps(children, indent=2))
+        else:
+            if not children:
+                click.echo(f"{result['name']}  — no available tasks")
             else:
-                if not first_tasks:
-                    click.echo(f"{result['name']}  — no available tasks")
-                else:
-                    click.echo(f"{result['name']}  — first available:")
-                    for t in first_tasks:
-                        click.echo(f"  {t['id'][:8]}  {format_task_line(t)}")
-            return
-        result["children"] = filter_available(result["children"])
+                click.echo(f"{result['name']}  — first available:")
+                for task_node in children:
+                    line = format_task_line(task_node)
+                    click.echo(f"  {task_node['id'][:8]}  {line}")
+        return
 
     if as_json:
-        remaining, total = count_tasks(result["children"])
-        result["remaining"] = remaining
-        result["total"] = total
-        strip_internal_fields(result["children"])
-        annotate_types(result["children"])
-        click.echo(json.dumps(result, indent=2))
+        response = dict(result)
+        response["children"] = children
+        remaining, total = count_tasks(children)
+        response["remaining"] = remaining
+        response["total"] = total
+        strip_internal_fields(response["children"])
+        annotate_types(response["children"])
+        click.echo(json.dumps(response, indent=2))
     else:
-        remaining, total = count_tasks(result["children"])
+        remaining, total = count_tasks(children)
         click.echo(f"{result['name']}  ({remaining}/{total} remaining)")
-        print_tree(result["children"])
+        print_tree(children)
 
 
 @project.command("open")
