@@ -17,7 +17,7 @@ def _parse_json_output(
 ) -> Any:
     """Parse bridge output as JSON, optionally unwrapping quoted JSON strings."""
     try:
-        return json.loads(stdout)
+        parsed = json.loads(stdout)
     except json.JSONDecodeError:
         if (
             unwrap_nested_json_string
@@ -30,6 +30,12 @@ def _parse_json_output(
             except (json.JSONDecodeError, TypeError):
                 pass
         raise OmniError(f"Failed to parse {error_prefix} output: {stdout!r}")
+    if unwrap_nested_json_string and isinstance(parsed, str):
+        try:
+            return json.loads(parsed)
+        except json.JSONDecodeError:
+            pass
+    return parsed
 
 
 def run_osascript_json(

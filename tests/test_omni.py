@@ -15,3 +15,18 @@ def test_run_omnijs_timeout_raises_omnierror(monkeypatch):
 
     with pytest.raises(OmniError, match="timed out"):
         run_omnijs("JSON.stringify({ok: true});")
+
+
+def test_run_omnijs_unwraps_nested_json_string(monkeypatch):
+    class Result:
+        stdout = '"{\\"ok\\": true, \\"items\\": [1, 2]}"'
+
+    def fake_run(*_args, **_kwargs):
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    assert run_omnijs("JSON.stringify({ok: true});") == {
+        "ok": True,
+        "items": [1, 2],
+    }
