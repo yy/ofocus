@@ -9,6 +9,16 @@ class OmniError(Exception):
     """Error from OmniFocus bridge execution."""
 
 
+def _unwrap_json_string(value: Any) -> Any:
+    """Parse a JSON string payload if it itself contains serialized JSON."""
+    if not isinstance(value, str):
+        return value
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return value
+
+
 def _parse_json_output(
     stdout: str,
     *,
@@ -19,22 +29,9 @@ def _parse_json_output(
     try:
         parsed = json.loads(stdout)
     except json.JSONDecodeError:
-        if (
-            unwrap_nested_json_string
-            and stdout.startswith('"')
-            and stdout.endswith('"')
-        ):
-            try:
-                inner = json.loads(stdout)
-                return json.loads(inner)
-            except (json.JSONDecodeError, TypeError):
-                pass
         raise OmniError(f"Failed to parse {error_prefix} output: {stdout!r}")
-    if unwrap_nested_json_string and isinstance(parsed, str):
-        try:
-            return json.loads(parsed)
-        except json.JSONDecodeError:
-            pass
+    if unwrap_nested_json_string:
+        return _unwrap_json_string(parsed)
     return parsed
 
 
