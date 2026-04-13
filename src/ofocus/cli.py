@@ -44,6 +44,9 @@ var flagged = doc.flattenedTasks.flagged();
 var dueDates = doc.flattenedTasks.dueDate();
 var projectNames = doc.flattenedTasks.containingProject.name();
 var childTasks = doc.flattenedTasks.tasks();
+var inboxActive = doc.inboxTasks().filter(function(t) {
+    return !t.completed() && !t.dropped();
+}).length;
 var today = toLocalDateString(new Date());
 var active = 0;
 var flaggedCount = 0;
@@ -57,7 +60,7 @@ for (var i = 0; i < completed.length; i++) {
     if (d && toLocalDateString(d) < today) overdue++;
 }
 JSON.stringify({
-    inbox: doc.inboxTasks().length,
+    inbox: inboxActive,
     active: active,
     projects: doc.flattenedProjects().length,
     tags: doc.flattenedTags().length,

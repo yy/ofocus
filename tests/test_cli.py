@@ -310,6 +310,31 @@ def test_stats_overdue_uses_local_calendar_dates(monkeypatch):
     assert "d && d < new Date()" not in scripts[0]
 
 
+def test_stats_filters_completed_and_dropped_inbox_tasks(monkeypatch):
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        return {
+            "inbox": 0,
+            "active": 0,
+            "projects": 0,
+            "tags": 0,
+            "flagged": 0,
+            "overdue": 0,
+        }
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["stats", "--json"])
+
+    assert result.exit_code == 0
+    assert len(scripts) == 1
+    assert "doc.inboxTasks().filter(function(t) {" in scripts[0]
+    assert "return !t.completed() && !t.dropped();" in scripts[0]
+    assert "inbox: doc.inboxTasks().length" not in scripts[0]
+
+
 def test_run_jxa_timeout_raises_omnierror(monkeypatch):
     def fake_run(*args, **kwargs):
         raise subprocess.TimeoutExpired(cmd=args[0], timeout=kwargs.get("timeout", 0))
