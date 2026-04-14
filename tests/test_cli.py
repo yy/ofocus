@@ -11,6 +11,7 @@ from ofocus.cli import cli
 from ofocus.helpers import (
     annotate_types,
     build_fuzzy_lookup_script,
+    build_js_json_stringify,
     build_task_field_assignments,
     build_task_lookup_script,
     check_ambiguous,
@@ -115,6 +116,12 @@ JSON.stringify({id: item.id(), name: item.name()});
     assert 'fuzzyMatch(doc.flattenedProjects, "Personal \\"Projects\\"")' in script
     assert 'JSON.stringify({error: "Project not found: \\"Personal\\""})' in script
     assert "var item = lookup.match;" in script
+
+
+def test_build_js_json_stringify_formats_compact_object_literal():
+    assert build_js_json_stringify(
+        [("id", "task.id()"), ("name", "task.name()"), ("completed", "true")]
+    ) == "JSON.stringify({id: task.id(), name: task.name(), completed: true});"
 
 
 def test_build_task_lookup_script_uses_global_scalar_prefix_scan():
@@ -535,6 +542,29 @@ def test_task_complete_honors_group_level_json_shorthand(monkeypatch):
     assert result.output.strip() == (
         '{\n  "id": "abc12345XYZ",\n  "name": "Read paper",\n  "completed": true\n}'
     )
+
+
+@pytest.mark.parametrize(
+    ("argv", "message"),
+    [
+        (
+            ["task", "--json", "open", "abc12345"],
+            "`--json` is not supported by `ofocus task open`.",
+        ),
+        (
+            ["project", "--json", "open", "proj12345"],
+            "`--json` is not supported by `ofocus project open`.",
+        ),
+    ],
+)
+def test_group_level_json_rejects_open_subcommands(monkeypatch, argv, message):
+    monkeypatch.setattr(_PATCH_JXA, lambda _script: {"id": "abc12345XYZ", "name": "X"})
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: None)
+    runner = CliRunner()
+    result = runner.invoke(cli, argv)
+
+    assert result.exit_code == 2
+    assert message in result.output
 
 
 def test_task_rejects_ls_only_filters_before_non_ls_subcommands():

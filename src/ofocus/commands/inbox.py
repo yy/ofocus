@@ -4,6 +4,7 @@ import click
 
 from ofocus import jxa
 from ofocus.helpers import (
+    build_js_json_stringify,
     build_task_field_assignments,
     echo_action_result,
     echo_task_list,
@@ -52,7 +53,7 @@ doc.inboxTasks.push(task);
 """
     if assignment_block:
         script += assignment_block + "\n"
-    script += "JSON.stringify({id: task.id(), name: task.name()});"
+    script += build_js_json_stringify([("id", "task.id()"), ("name", "task.name()")])
 
     result = run_jxa_or_exit(script)
     echo_action_result(

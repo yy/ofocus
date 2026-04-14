@@ -7,6 +7,7 @@ import click
 
 from ofocus import jxa
 from ofocus.helpers import (
+    build_js_json_stringify,
     build_task_field_assignments,
     echo_action_result,
     echo_task_list,
@@ -90,6 +91,9 @@ def task(ctx, project_filter, tag, flagged, due_before, as_json):
             f"{options} can only be used with `ofocus task ls` or bare `ofocus task`."
         )
 
+    if as_json and ctx.invoked_subcommand == "open":
+        raise click.UsageError("`--json` is not supported by `ofocus task open`.")
+
     if as_json and ctx.invoked_subcommand in {
         "complete",
         "update",
@@ -134,10 +138,18 @@ def complete(task_id, as_json):
     """Mark a task as complete."""
     result = _run_task_action(
         task_id,
-        """\
-app.markComplete(task);
-JSON.stringify({id: task.id(), name: task.name(), completed: true});
-""",
+        "\n".join(
+            [
+                "app.markComplete(task);",
+                build_js_json_stringify(
+                    [
+                        ("id", "task.id()"),
+                        ("name", "task.name()"),
+                        ("completed", "true"),
+                    ]
+                ),
+            ]
+        ),
     )
     echo_action_result(result, "Completed", as_json=as_json, fallback_name=task_id)
 
@@ -167,6 +179,14 @@ def update(task_id, name, due, flag, note, project, as_json):
     update_code = "\n".join(updates)
     if project is not None:
         apply_updates = f"{indent(update_code, '    ')}\n" if update_code else ""
+        task_result = build_js_json_stringify(
+            [
+                ("id", "task.id()"),
+                ("name", "task.name()"),
+                ("flagged", "task.flagged()"),
+                ("project", "proj ? proj.name() : null"),
+            ]
+        )
         success_code = f"""\
 var projLookup = fuzzyMatch(doc.flattenedProjects, "{js_escape(project)}");
 if (projLookup.error === "not_found") {{
@@ -176,23 +196,21 @@ if (projLookup.error === "not_found") {{
 }} else {{
     projLookup.match.tasks.push(task);
 {apply_updates}    var proj = task.containingProject();
-    JSON.stringify({{
-        id: task.id(),
-        name: task.name(),
-        flagged: task.flagged(),
-        project: proj ? proj.name() : null
-    }});
+    {task_result}
 }}"""
     else:
+        task_result = build_js_json_stringify(
+            [
+                ("id", "task.id()"),
+                ("name", "task.name()"),
+                ("flagged", "task.flagged()"),
+                ("project", "proj ? proj.name() : null"),
+            ]
+        )
         success_code = f"""\
 {update_code}
 var proj = task.containingProject();
-JSON.stringify({{
-    id: task.id(),
-    name: task.name(),
-    flagged: task.flagged(),
-    project: proj ? proj.name() : null
-}});"""
+{task_result}"""
     result = _run_task_action(
         task_id,
         success_code,
@@ -209,10 +227,18 @@ def drop(task_id, as_json):
     """Drop (mark as dropped) a task."""
     result = _run_task_action(
         task_id,
-        """\
-app.markDropped(task);
-JSON.stringify({id: task.id(), name: task.name(), dropped: true});
-""",
+        "\n".join(
+            [
+                "app.markDropped(task);",
+                build_js_json_stringify(
+                    [
+                        ("id", "task.id()"),
+                        ("name", "task.name()"),
+                        ("dropped", "true"),
+                    ]
+                ),
+            ]
+        ),
     )
     echo_action_result(result, "Dropped", as_json=as_json, fallback_name=task_id)
 
@@ -224,12 +250,16 @@ def delete(task_id, as_json):
     """Delete a task permanently."""
     result = _run_task_action(
         task_id,
-        """\
-var name = task.name();
-var id = task.id();
-app.delete(task);
-JSON.stringify({id: id, name: name, deleted: true});
-""",
+        "\n".join(
+            [
+                "var name = task.name();",
+                "var id = task.id();",
+                "app.delete(task);",
+                build_js_json_stringify(
+                    [("id", "id"), ("name", "name"), ("deleted", "true")]
+                ),
+            ]
+        ),
     )
     echo_action_result(result, "Deleted", as_json=as_json, fallback_name=task_id)
 
@@ -240,9 +270,7 @@ def open_task(task_id):
     """Open a task in OmniFocus."""
     result = _run_task_action(
         task_id,
-        """\
-JSON.stringify({id: task.id(), name: task.name()});
-""",
+        build_js_json_stringify([("id", "task.id()"), ("name", "task.name()")]),
     )
     open_omnifocus_item(result["id"])
     echo_action_result(result, "Opened", as_json=False, fallback_name=task_id)

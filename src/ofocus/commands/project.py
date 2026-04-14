@@ -10,6 +10,7 @@ from ofocus import jxa
 from ofocus.helpers import (
     annotate_types,
     build_fuzzy_lookup_script,
+    build_js_json_stringify,
     check_ambiguous,
     check_result_error,
     count_tasks,
@@ -34,6 +35,9 @@ def project(ctx, as_json):
     if ctx.invoked_subcommand is None:
         ctx.invoke(ls, folder=None, as_json=as_json)
         return
+
+    if as_json and ctx.invoked_subcommand == "open":
+        raise click.UsageError("`--json` is not supported by `ofocus project open`.")
 
     if as_json and ctx.invoked_subcommand in {"ls", "show", "create"}:
         set_subcommand_defaults(ctx, ctx.invoked_subcommand, as_json=as_json)
@@ -179,9 +183,7 @@ def open_project(project):
     script = build_fuzzy_lookup_script(
         project,
         "doc.flattenedProjects",
-        """\
-JSON.stringify({id: item.id(), name: item.name()});
-""",
+        build_js_json_stringify([("id", "item.id()"), ("name", "item.name()")]),
         item_var="item",
         not_found_error="Project not found",
     )
@@ -199,28 +201,34 @@ JSON.stringify({id: item.id(), name: item.name()});
 def create(name, folder, as_json):
     """Create a new project."""
     if folder:
+        folder_result = build_js_json_stringify(
+            [
+                ("id", "proj.id()"),
+                ("name", "proj.name()"),
+                ("folder", "item.name()"),
+            ]
+        )
         script = build_fuzzy_lookup_script(
             folder,
             "doc.flattenedFolders",
             f"""\
 var proj = app.Project({{name: "{js_escape(name)}"}});
 item.projects.push(proj);
-JSON.stringify({{
-    id: proj.id(),
-    name: proj.name(),
-    folder: item.name()
-}});
+{folder_result}
 """,
             item_var="item",
             not_found_error=f"Folder not found: {folder}",
         )
     else:
+        project_result = build_js_json_stringify(
+            [("id", "proj.id()"), ("name", "proj.name()")]
+        )
         script = f"""\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
 var proj = app.Project({{name: "{js_escape(name)}"}});
 doc.projects.push(proj);
-JSON.stringify({{id: proj.id(), name: proj.name()}});
+{project_result}
 """
     result = run_jxa_or_exit(script)
     check_ambiguous(result, "folders")

@@ -10,8 +10,8 @@ from typing import Any, Protocol, Sequence
 
 import click
 
+from ofocus.bridge import OmniError
 from ofocus.models import Task
-from ofocus.omni import OmniError
 
 
 class RenderableItem(Protocol):
@@ -64,6 +64,12 @@ def js_escape(s: str) -> str:
         .replace("\u2028", "\\u2028")
         .replace("\u2029", "\\u2029")
     )
+
+
+def build_js_json_stringify(fields: Sequence[tuple[str, str]]) -> str:
+    """Build a compact JSON.stringify({...}) expression from JS field mappings."""
+    pairs = ", ".join(f"{name}: {expr}" for name, expr in fields)
+    return f"JSON.stringify({{{pairs}}});"
 
 
 def jxa_local_date_constructor(value: str) -> str:
