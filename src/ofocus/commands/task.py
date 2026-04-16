@@ -8,7 +8,9 @@ import click
 from ofocus import jxa
 from ofocus.helpers import (
     build_js_json_stringify,
+    build_task_action_success_code,
     build_task_field_assignments,
+    build_task_result_stringify,
     echo_action_result,
     echo_task_list,
     js_escape,
@@ -138,17 +140,9 @@ def complete(task_id, as_json):
     """Mark a task as complete."""
     result = _run_task_action(
         task_id,
-        "\n".join(
-            [
-                "app.markComplete(task);",
-                build_js_json_stringify(
-                    [
-                        ("id", "task.id()"),
-                        ("name", "task.name()"),
-                        ("completed", "true"),
-                    ]
-                ),
-            ]
+        build_task_action_success_code(
+            "app.markComplete(task);",
+            result_fields=[("completed", "true")],
         ),
     )
     echo_action_result(result, "Completed", as_json=as_json, fallback_name=task_id)
@@ -177,16 +171,14 @@ def update(task_id, name, due, flag, note, project, as_json):
         click.echo("No updates specified.", err=True)
         sys.exit(1)
     update_code = "\n".join(updates)
+    task_result = build_task_result_stringify(
+        [
+            ("flagged", "task.flagged()"),
+            ("project", "proj ? proj.name() : null"),
+        ]
+    )
     if project is not None:
         apply_updates = f"{indent(update_code, '    ')}\n" if update_code else ""
-        task_result = build_js_json_stringify(
-            [
-                ("id", "task.id()"),
-                ("name", "task.name()"),
-                ("flagged", "task.flagged()"),
-                ("project", "proj ? proj.name() : null"),
-            ]
-        )
         success_code = f"""\
 var projLookup = fuzzyMatch(doc.flattenedProjects, "{js_escape(project)}");
 if (projLookup.error === "not_found") {{
@@ -199,14 +191,6 @@ if (projLookup.error === "not_found") {{
     {task_result}
 }}"""
     else:
-        task_result = build_js_json_stringify(
-            [
-                ("id", "task.id()"),
-                ("name", "task.name()"),
-                ("flagged", "task.flagged()"),
-                ("project", "proj ? proj.name() : null"),
-            ]
-        )
         success_code = f"""\
 {update_code}
 var proj = task.containingProject();
@@ -227,17 +211,9 @@ def drop(task_id, as_json):
     """Drop (mark as dropped) a task."""
     result = _run_task_action(
         task_id,
-        "\n".join(
-            [
-                "app.markDropped(task);",
-                build_js_json_stringify(
-                    [
-                        ("id", "task.id()"),
-                        ("name", "task.name()"),
-                        ("dropped", "true"),
-                    ]
-                ),
-            ]
+        build_task_action_success_code(
+            "app.markDropped(task);",
+            result_fields=[("dropped", "true")],
         ),
     )
     echo_action_result(result, "Dropped", as_json=as_json, fallback_name=task_id)
@@ -270,7 +246,7 @@ def open_task(task_id):
     """Open a task in OmniFocus."""
     result = _run_task_action(
         task_id,
-        build_js_json_stringify([("id", "task.id()"), ("name", "task.name()")]),
+        build_task_result_stringify(),
     )
     open_omnifocus_item(result["id"])
     echo_action_result(result, "Opened", as_json=False, fallback_name=task_id)

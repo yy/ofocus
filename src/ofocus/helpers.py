@@ -23,6 +23,7 @@ class RenderableItem(Protocol):
 
     def to_line(self) -> str: ...
 
+
 # ── Validators ──────────────────────────────────────────────────────────
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -72,6 +73,42 @@ def build_js_json_stringify(fields: Sequence[tuple[str, str]]) -> str:
     return f"JSON.stringify({{{pairs}}});"
 
 
+def build_item_result_stringify(
+    extra_fields: Sequence[tuple[str, str]] = (),
+    *,
+    target: str = "item",
+) -> str:
+    """Build a standard ID/name result payload for a JXA object."""
+    fields = [("id", f"{target}.id()"), ("name", f"{target}.name()")]
+    fields.extend(extra_fields)
+    return build_js_json_stringify(fields)
+
+
+def build_task_result_stringify(
+    extra_fields: Sequence[tuple[str, str]] = (),
+    *,
+    target: str = "task",
+) -> str:
+    """Build a standard task result payload with optional extra fields."""
+    return build_item_result_stringify(extra_fields, target=target)
+
+
+def build_task_action_success_code(
+    *statements: str,
+    result_fields: Sequence[tuple[str, str]] = (),
+    target: str = "task",
+) -> str:
+    """Join task action statements with a standard serialized result payload."""
+    lines = [statement for statement in statements if statement]
+    lines.append(
+        build_task_result_stringify(
+            result_fields,
+            target=target,
+        )
+    )
+    return "\n".join(lines)
+
+
 def jxa_local_date_constructor(value: str) -> str:
     """Return a JXA Date constructor that preserves the local calendar date."""
     parsed = date.fromisoformat(validate_date(value))
@@ -91,9 +128,7 @@ def build_task_field_assignments(
     if name is not None:
         assignments.append(f'{target}.name = "{js_escape(name)}";')
     if due is not None:
-        assignments.append(
-            f"{target}.dueDate = {jxa_local_date_constructor(due)};"
-        )
+        assignments.append(f"{target}.dueDate = {jxa_local_date_constructor(due)};")
     if flag is not None:
         assignments.append(f"{target}.flagged = {'true' if flag else 'false'};")
     if note is not None:

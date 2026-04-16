@@ -10,7 +10,7 @@ from ofocus import jxa
 from ofocus.helpers import (
     annotate_types,
     build_fuzzy_lookup_script,
-    build_js_json_stringify,
+    build_item_result_stringify,
     check_ambiguous,
     check_result_error,
     count_tasks,
@@ -183,7 +183,7 @@ def open_project(project):
     script = build_fuzzy_lookup_script(
         project,
         "doc.flattenedProjects",
-        build_js_json_stringify([("id", "item.id()"), ("name", "item.name()")]),
+        build_item_result_stringify(),
         item_var="item",
         not_found_error="Project not found",
     )
@@ -201,12 +201,9 @@ def open_project(project):
 def create(name, folder, as_json):
     """Create a new project."""
     if folder:
-        folder_result = build_js_json_stringify(
-            [
-                ("id", "proj.id()"),
-                ("name", "proj.name()"),
-                ("folder", "item.name()"),
-            ]
+        folder_result = build_item_result_stringify(
+            [("folder", "item.name()")],
+            target="proj",
         )
         script = build_fuzzy_lookup_script(
             folder,
@@ -220,9 +217,7 @@ item.projects.push(proj);
             not_found_error=f"Folder not found: {folder}",
         )
     else:
-        project_result = build_js_json_stringify(
-            [("id", "proj.id()"), ("name", "proj.name()")]
-        )
+        project_result = build_item_result_stringify(target="proj")
         script = f"""\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;

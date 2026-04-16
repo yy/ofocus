@@ -11,9 +11,12 @@ from ofocus.cli import cli
 from ofocus.helpers import (
     annotate_types,
     build_fuzzy_lookup_script,
+    build_item_result_stringify,
     build_js_json_stringify,
+    build_task_action_success_code,
     build_task_field_assignments,
     build_task_lookup_script,
+    build_task_result_stringify,
     check_ambiguous,
     collect_first_available,
     count_tasks,
@@ -119,9 +122,39 @@ JSON.stringify({id: item.id(), name: item.name()});
 
 
 def test_build_js_json_stringify_formats_compact_object_literal():
-    assert build_js_json_stringify(
-        [("id", "task.id()"), ("name", "task.name()"), ("completed", "true")]
-    ) == "JSON.stringify({id: task.id(), name: task.name(), completed: true});"
+    assert (
+        build_js_json_stringify(
+            [("id", "task.id()"), ("name", "task.name()"), ("completed", "true")]
+        )
+        == "JSON.stringify({id: task.id(), name: task.name(), completed: true});"
+    )
+
+
+def test_build_item_result_stringify_uses_id_name_pair_by_default():
+    assert build_item_result_stringify() == (
+        "JSON.stringify({id: item.id(), name: item.name()});"
+    )
+
+
+def test_build_task_result_stringify_includes_standard_task_fields():
+    assert build_task_result_stringify(
+        [("flagged", "task.flagged()"), ("project", "proj ? proj.name() : null")]
+    ) == (
+        "JSON.stringify({id: task.id(), name: task.name(), flagged: task.flagged(), "
+        "project: proj ? proj.name() : null});"
+    )
+
+
+def test_build_task_action_success_code_appends_standard_result_payload():
+    assert build_task_action_success_code(
+        "app.markComplete(task);",
+        result_fields=[("completed", "true")],
+    ) == "\n".join(
+        [
+            "app.markComplete(task);",
+            "JSON.stringify({id: task.id(), name: task.name(), completed: true});",
+        ]
+    )
 
 
 def test_build_task_lookup_script_uses_global_scalar_prefix_scan():
