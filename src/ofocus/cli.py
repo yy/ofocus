@@ -43,6 +43,7 @@ var dropped = doc.flattenedTasks.dropped();
 var flagged = doc.flattenedTasks.flagged();
 var dueDates = doc.flattenedTasks.dueDate();
 var projectNames = doc.flattenedTasks.containingProject.name();
+var projectStatuses = doc.flattenedTasks.containingProject.status();
 var childTasks = doc.flattenedTasks.tasks();
 var inboxActive = doc.inboxTasks().filter(function(t) {
     return !t.completed() && !t.dropped();
@@ -53,7 +54,9 @@ var flaggedCount = 0;
 var overdue = 0;
 for (var i = 0; i < completed.length; i++) {
     var isAction = !!projectNames[i] && childTasks[i].length === 0;
-    if (!isAction || completed[i] || dropped[i]) continue;
+    var isActiveProject =
+        projectStatuses[i] === "active" || projectStatuses[i] === "active status";
+    if (!isAction || !isActiveProject || completed[i] || dropped[i]) continue;
     active++;
     if (flagged[i]) flaggedCount++;
     var d = dueDates[i];

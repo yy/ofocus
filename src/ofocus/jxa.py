@@ -231,11 +231,20 @@ var dropped = doc.flattenedTasks.dropped();
 var dueDates = doc.flattenedTasks.dueDate();
 var notes = doc.flattenedTasks.note();
 var projectNames = doc.flattenedTasks.containingProject.name();
+var projectStatuses = doc.flattenedTasks.containingProject.status();
 var childTasks = doc.flattenedTasks.tasks();
 var tagNames = doc.flattenedTasks.tags.name();
 var tasks = [];
 for (var i = 0; i < ids.length; i++) {
-    if (!projectNames[i] || childTasks[i].length !== 0 || completed[i] || dropped[i]) {
+    var isActiveProject =
+        projectStatuses[i] === "active" || projectStatuses[i] === "active status";
+    if (
+        !projectNames[i] ||
+        !isActiveProject ||
+        childTasks[i].length !== 0 ||
+        completed[i] ||
+        dropped[i]
+    ) {
         continue;
     }
     tasks.push({
