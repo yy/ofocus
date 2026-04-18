@@ -23,6 +23,16 @@ function isIndividualAction(t) {
 }
 """
 
+JS_PROJECT_STATUS_HELPERS = """\
+function getProjectStatus(project) {
+    try { return project.status(); } catch(e) { return "active"; }
+}
+
+function isActiveProjectStatus(status) {
+    return status === "active" || status === "active status";
+}
+"""
+
 # Reusable JXA function: fuzzy-match an item from a collection by ID or name.
 # `collection` is a JXA specifier (not pre-resolved array) — e.g.
 # doc.flattenedProjects, NOT doc.flattenedProjects().
@@ -130,11 +140,9 @@ function findTaskById(doc, query) {
 }
 """
 
-JS_PROJECT_LIST_HELPERS = """\
-function getProjectStatus(project) {
-    try { return project.status(); } catch(e) { return "active"; }
-}
-
+JS_PROJECT_LIST_HELPERS = (
+    JS_PROJECT_STATUS_HELPERS
+    + """\
 function countRemainingTasks(project) {
     return project.flattenedTasks().filter(function(t) {
         return !t.completed() && !t.dropped();
@@ -144,8 +152,7 @@ function countRemainingTasks(project) {
 function countActiveProjects(projects) {
     var activeCount = 0;
     for (var i = 0; i < projects.length; i++) {
-        var status = getProjectStatus(projects[i]);
-        if (status === "active" || status === "active status") activeCount++;
+        if (isActiveProjectStatus(getProjectStatus(projects[i]))) activeCount++;
     }
     return activeCount;
 }
@@ -171,6 +178,7 @@ function serializeProjectSummary(project) {
     };
 }
 """
+)
 
 # Reusable JXA: serialize a folder's subfolders and projects into a list.
 JS_SERIALIZE_FOLDER_CONTENTS = (
@@ -221,6 +229,7 @@ JS_TASKS = (
     """\
 """
     + JS_LOCAL_DATE_HELPERS
+    + JS_PROJECT_STATUS_HELPERS
     + """\
 var doc = Application("OmniFocus").defaultDocument;
 var ids = doc.flattenedTasks.id();
@@ -231,16 +240,16 @@ var dropped = doc.flattenedTasks.dropped();
 var dueDates = doc.flattenedTasks.dueDate();
 var notes = doc.flattenedTasks.note();
 var projectNames = doc.flattenedTasks.containingProject.name();
+var projectIds = doc.flattenedTasks.containingProject.id();
 var projectStatuses = doc.flattenedTasks.containingProject.status();
 var childTasks = doc.flattenedTasks.tasks();
 var tagNames = doc.flattenedTasks.tags.name();
 var tasks = [];
 for (var i = 0; i < ids.length; i++) {
-    var isActiveProject =
-        projectStatuses[i] === "active" || projectStatuses[i] === "active status";
     if (
         !projectNames[i] ||
-        !isActiveProject ||
+        ids[i] === projectIds[i] ||
+        !isActiveProjectStatus(projectStatuses[i]) ||
         childTasks[i].length !== 0 ||
         completed[i] ||
         dropped[i]
@@ -262,16 +271,65 @@ JSON.stringify(tasks);
 """
 )
 
-JS_PROJECTS = """\
+JS_STATS = (
+    """\
+"""
+    + JS_LOCAL_DATE_HELPERS
+    + JS_PROJECT_STATUS_HELPERS
+    + """\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var ids = doc.flattenedTasks.id();
+var completed = doc.flattenedTasks.completed();
+var dropped = doc.flattenedTasks.dropped();
+var flagged = doc.flattenedTasks.flagged();
+var dueDates = doc.flattenedTasks.dueDate();
+var projectNames = doc.flattenedTasks.containingProject.name();
+var projectIds = doc.flattenedTasks.containingProject.id();
+var projectStatuses = doc.flattenedTasks.containingProject.status();
+var childTasks = doc.flattenedTasks.tasks();
+var inboxActive = doc.inboxTasks().filter(function(t) {
+    return !t.completed() && !t.dropped();
+}).length;
+var today = toLocalDateString(new Date());
+var active = 0;
+var flaggedCount = 0;
+var overdue = 0;
+for (var i = 0; i < completed.length; i++) {
+    var isAction = !!projectNames[i] && childTasks[i].length === 0;
+    if (
+        !isAction ||
+        ids[i] === projectIds[i] ||
+        !isActiveProjectStatus(projectStatuses[i]) ||
+        completed[i] ||
+        dropped[i]
+    ) continue;
+    active++;
+    if (flagged[i]) flaggedCount++;
+    var d = dueDates[i];
+    if (d && toLocalDateString(d) < today) overdue++;
+}
+JSON.stringify({
+    inbox: inboxActive,
+    active: active,
+    projects: doc.flattenedProjects().length,
+    tags: doc.flattenedTags().length,
+    flagged: flaggedCount,
+    overdue: overdue
+});
+"""
+)
+
+JS_PROJECTS = (
+    JS_PROJECT_STATUS_HELPERS
+    + """\
 var doc = Application("OmniFocus").defaultDocument;
 var projects = doc.flattenedProjects().map(function(p) {
-    var s;
-    try { s = p.status(); } catch(e) { s = "active"; }
     var f = p.folder();
     return {
         id: p.id(),
         name: p.name(),
-        status: s,
+        status: getProjectStatus(p),
         taskCount: p.flattenedTasks().length,
         folder: f ? f.name() : null,
         note: p.note()
@@ -279,6 +337,7 @@ var projects = doc.flattenedProjects().map(function(p) {
 });
 JSON.stringify(projects);
 """
+)
 
 JS_TAGS = """\
 var doc = Application("OmniFocus").defaultDocument;
@@ -292,6 +351,7 @@ JS_SHOW_PROJECT = (
     """\
 """
     + JS_LOCAL_DATE_HELPERS
+    + JS_PROJECT_STATUS_HELPERS
     + JS_FUZZY_MATCH
     + """\
 var app = Application("OmniFocus");
@@ -322,12 +382,10 @@ if (lookup.error === "not_found") {
     result = lookup;
 } else {
     var proj = lookup.match;
-    var s;
-    try { s = proj.status(); } catch(e) { s = "active"; }
     result = {
         id: proj.id(),
         name: proj.name(),
-        status: s,
+        status: getProjectStatus(proj),
         note: proj.note(),
         sequential: proj.sequential(),
         children: proj.tasks().map(serializeTask)

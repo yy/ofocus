@@ -4,6 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+ACTIVE_PROJECT_STATUSES = frozenset({"active", "active status"})
+
+
+def is_active_project_status(status: str | None) -> bool:
+    """Return whether a project status should be treated as active."""
+    return status in ACTIVE_PROJECT_STATUSES
+
 
 @dataclass
 class Tag:
@@ -99,7 +106,7 @@ class Project:
         if self.folder:
             parts.append(f"[{self.folder}]")
         parts.append(f"({self.task_count} tasks)")
-        if self.status != "active":
+        if not is_active_project_status(self.status):
             parts.append(f"— {self.status}")
         return " ".join(parts)
 

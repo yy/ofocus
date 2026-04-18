@@ -33,46 +33,7 @@ cli.add_command(tag)
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def stats(as_json):
     """Show quick counts."""
-    script = (
-        jxa.JS_LOCAL_DATE_HELPERS
-        + """\
-var app = Application("OmniFocus");
-var doc = app.defaultDocument;
-var completed = doc.flattenedTasks.completed();
-var dropped = doc.flattenedTasks.dropped();
-var flagged = doc.flattenedTasks.flagged();
-var dueDates = doc.flattenedTasks.dueDate();
-var projectNames = doc.flattenedTasks.containingProject.name();
-var projectStatuses = doc.flattenedTasks.containingProject.status();
-var childTasks = doc.flattenedTasks.tasks();
-var inboxActive = doc.inboxTasks().filter(function(t) {
-    return !t.completed() && !t.dropped();
-}).length;
-var today = toLocalDateString(new Date());
-var active = 0;
-var flaggedCount = 0;
-var overdue = 0;
-for (var i = 0; i < completed.length; i++) {
-    var isAction = !!projectNames[i] && childTasks[i].length === 0;
-    var isActiveProject =
-        projectStatuses[i] === "active" || projectStatuses[i] === "active status";
-    if (!isAction || !isActiveProject || completed[i] || dropped[i]) continue;
-    active++;
-    if (flagged[i]) flaggedCount++;
-    var d = dueDates[i];
-    if (d && toLocalDateString(d) < today) overdue++;
-}
-JSON.stringify({
-    inbox: inboxActive,
-    active: active,
-    projects: doc.flattenedProjects().length,
-    tags: doc.flattenedTags().length,
-    flagged: flaggedCount,
-    overdue: overdue
-});
-"""
-    )
-    result = run_jxa_or_exit(script)
+    result = run_jxa_or_exit(jxa.JS_STATS)
     if as_json:
         click.echo(json.dumps(result, indent=2))
     else:

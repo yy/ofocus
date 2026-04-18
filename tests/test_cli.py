@@ -39,7 +39,11 @@ from ofocus.helpers import (
 from ofocus.jxa import (
     JS_ACTION_TASK_HELPERS,
     JS_INBOX,
+    JS_PROJECT_STATUS_HELPERS,
+    JS_PROJECTS,
     JS_SERIALIZE_FOLDER_CONTENTS,
+    JS_SHOW_PROJECT,
+    JS_STATS,
     JS_TASKS,
     JS_TOP_LEVEL,
     run_jxa,
@@ -281,6 +285,7 @@ def test_cli_version_matches_package_version():
 def test_js_tasks_uses_scalar_field_arrays_for_speed():
     assert "doc.flattenedTasks.id()" in JS_TASKS
     assert "doc.flattenedTasks.containingProject.name()" in JS_TASKS
+    assert "doc.flattenedTasks.containingProject.id()" in JS_TASKS
     assert "doc.flattenedTasks.tasks()" in JS_TASKS
     assert "doc.flattenedTasks.tags.name()" in JS_TASKS
     assert "doc.flattenedTasks().filter" not in JS_TASKS
@@ -295,7 +300,8 @@ def test_action_task_helper_includes_top_level_project_actions():
 
 def test_js_tasks_filters_project_actions_and_excludes_task_groups():
     assert "!projectNames[i]" in JS_TASKS
-    assert 'projectStatuses[i] === "active"' in JS_TASKS
+    assert "ids[i] === projectIds[i]" in JS_TASKS
+    assert "isActiveProjectStatus(projectStatuses[i])" in JS_TASKS
     assert "childTasks[i].length !== 0" in JS_TASKS
     assert "completed[i]" in JS_TASKS
     assert "dropped[i]" in JS_TASKS
@@ -303,8 +309,18 @@ def test_js_tasks_filters_project_actions_and_excludes_task_groups():
 
 def test_js_tasks_excludes_inactive_project_statuses():
     assert "doc.flattenedTasks.containingProject.status()" in JS_TASKS
-    assert "!isActiveProject" in JS_TASKS
-    assert 'projectStatuses[i] === "active status"' in JS_TASKS
+    assert "!isActiveProjectStatus(projectStatuses[i])" in JS_TASKS
+    assert "function getProjectStatus(project)" in JS_PROJECT_STATUS_HELPERS
+    assert 'return status === "active" || status === "active status";' in (
+        JS_PROJECT_STATUS_HELPERS
+    )
+
+
+def test_project_scripts_reuse_shared_status_lookup_helper():
+    assert "status: getProjectStatus(p)" in JS_PROJECTS
+    assert "status: getProjectStatus(proj)" in JS_SHOW_PROJECT
+    assert "try { s = p.status(); }" not in JS_PROJECTS
+    assert "try { s = proj.status(); }" not in JS_SHOW_PROJECT
 
 
 def test_js_due_dates_use_local_date_strings():
@@ -352,13 +368,17 @@ def test_stats_excludes_dropped_from_active_and_overdue(monkeypatch):
 
     assert result.exit_code == 0
     assert len(scripts) == 1
+    assert "doc.flattenedTasks.id()" in scripts[0]
     assert "doc.flattenedTasks.completed()" in scripts[0]
     assert "doc.flattenedTasks.containingProject.name()" in scripts[0]
+    assert "doc.flattenedTasks.containingProject.id()" in scripts[0]
     assert "doc.flattenedTasks.containingProject.status()" in scripts[0]
     assert "doc.flattenedTasks.tasks()" in scripts[0]
     assert "childTasks[i].length === 0" in scripts[0]
-    assert "!isActiveProject" in scripts[0]
-    assert "completed[i] || dropped[i]" in scripts[0]
+    assert "ids[i] === projectIds[i]" in scripts[0]
+    assert "!isActiveProjectStatus(projectStatuses[i])" in scripts[0]
+    assert "completed[i] ||" in scripts[0]
+    assert "dropped[i]" in scripts[0]
     assert "doc.flattenedTasks().filter" not in scripts[0]
 
 
@@ -411,6 +431,28 @@ def test_stats_filters_completed_and_dropped_inbox_tasks(monkeypatch):
     assert "doc.inboxTasks().filter(function(t) {" in scripts[0]
     assert "return !t.completed() && !t.dropped();" in scripts[0]
     assert "inbox: doc.inboxTasks().length" not in scripts[0]
+
+
+def test_stats_uses_shared_jxa_constant(monkeypatch):
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        return {
+            "inbox": 0,
+            "active": 0,
+            "projects": 0,
+            "tags": 0,
+            "flagged": 0,
+            "overdue": 0,
+        }
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["stats", "--json"])
+
+    assert result.exit_code == 0
+    assert scripts == [JS_STATS]
 
 
 def test_run_jxa_timeout_raises_omnierror(monkeypatch):

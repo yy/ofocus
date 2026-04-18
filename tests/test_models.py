@@ -1,6 +1,6 @@
 """Unit tests for models — no OmniFocus needed."""
 
-from ofocus.models import Folder, Project, Tag, Task
+from ofocus.models import Folder, Project, Tag, Task, is_active_project_status
 
 
 def test_task_from_dict_minimal():
@@ -61,6 +61,23 @@ def test_project_from_dict():
 def test_project_to_line():
     p = Project(id="p1", name="Work", task_count=5, folder="Main")
     assert "Work [Main] (5 tasks)" == p.to_line()
+
+
+def test_project_to_line_hides_active_status_variant():
+    p = Project(
+        id="p1",
+        name="Work",
+        task_count=5,
+        folder="Main",
+        status="active status",
+    )
+    assert "Work [Main] (5 tasks)" == p.to_line()
+
+
+def test_is_active_project_status_accepts_known_active_variants():
+    assert is_active_project_status("active")
+    assert is_active_project_status("active status")
+    assert not is_active_project_status("on hold")
 
 
 def test_tag_from_dict():

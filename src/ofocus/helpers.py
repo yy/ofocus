@@ -11,7 +11,7 @@ from typing import Any, Protocol, Sequence
 import click
 
 from ofocus.bridge import OmniError
-from ofocus.models import Task
+from ofocus.models import Task, is_active_project_status
 
 
 class RenderableItem(Protocol):
@@ -380,7 +380,7 @@ def print_ls_items(items: list[dict]):
         else:
             status = (
                 f" ({item['status']})"
-                if item["status"] not in ("active", "active status")
+                if not is_active_project_status(item["status"])
                 else ""
             )
             click.echo(
