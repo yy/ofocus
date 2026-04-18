@@ -121,6 +121,21 @@ JSON.stringify({id: item.id(), name: item.name()});
     assert "var item = lookup.match;" in script
 
 
+def test_build_fuzzy_lookup_script_reuses_shared_scaffold_and_prefix():
+    script = build_fuzzy_lookup_script(
+        "Personal",
+        "doc.flattenedProjects",
+        "JSON.stringify({id: item.id(), name: item.name()});",
+        script_prefix="// prefix\n",
+        not_found_error="Project not found",
+    )
+
+    assert script.startswith("// prefix\n")
+    assert script.count('var app = Application("OmniFocus");') == 1
+    assert script.count("var doc = app.defaultDocument;") == 1
+    assert "else {\n    var item = lookup.match;" in script
+
+
 def test_build_js_json_stringify_formats_compact_object_literal():
     assert (
         build_js_json_stringify(
@@ -170,6 +185,19 @@ JSON.stringify({id: task.id(), name: task.name()});
     assert "var names = doc.flattenedTasks.name();" in script
     assert "var inbox = doc.inboxTasks();" not in script
     assert "doc.flattenedTasks.whose({id: prefixIds[0]})();" in script
+
+
+def test_build_task_lookup_script_reuses_shared_scaffold_and_prefix():
+    script = build_task_lookup_script(
+        "abc12345",
+        "JSON.stringify({id: task.id(), name: task.name()});",
+        script_prefix="// prefix\n",
+    )
+
+    assert script.startswith("// prefix\n")
+    assert script.count('var app = Application("OmniFocus");') == 1
+    assert script.count("var doc = app.defaultDocument;") == 1
+    assert "if (lookup.error) {\n    JSON.stringify(lookup);\n}\nelse {" in script
 
 
 # ── validate_date ──────────────────────────────────────────────────────

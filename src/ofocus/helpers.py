@@ -235,21 +235,16 @@ def build_task_lookup_script(
     """Build a JXA script that resolves a task by exact ID or unique prefix."""
     from ofocus import jxa
 
-    return (
-        script_prefix
-        + jxa.JS_FIND_TASK_BY_ID
-        + f"""\
-var app = Application("OmniFocus");
-var doc = app.defaultDocument;
+    return _build_lookup_script(
+        script_prefix=script_prefix,
+        lookup_helper_code=jxa.JS_FIND_TASK_BY_ID,
+        lookup_setup=f"""\
 var query = "{js_escape(task_id)}";
 var lookup = findTaskById(doc, query);
-if (lookup.error) {{
-    JSON.stringify(lookup);
-}} else {{
-    var task = lookup.match;
-{indent(success_code.rstrip(), "    ")}
-}}
-"""
+""",
+        success_code=success_code,
+        match_var="task",
+        error_branch="if (lookup.error) {\n    JSON.stringify(lookup);\n}",
     )
 
 
@@ -265,19 +260,43 @@ def build_fuzzy_lookup_script(
     """Build a JXA script that fuzzy-matches an item and runs success code."""
     from ofocus import jxa
 
-    return (
-        script_prefix
-        + jxa.JS_FUZZY_MATCH
-        + f"""\
-var app = Application("OmniFocus");
-var doc = app.defaultDocument;
-var lookup = fuzzyMatch({collection_expr}, "{js_escape(query)}");
+    return _build_lookup_script(
+        script_prefix=script_prefix,
+        lookup_helper_code=jxa.JS_FUZZY_MATCH,
+        lookup_setup=(
+            f'var lookup = fuzzyMatch({collection_expr}, "{js_escape(query)}");'
+        ),
+        success_code=success_code,
+        match_var=item_var,
+        error_branch=f"""\
 if (lookup.error === "not_found") {{
     JSON.stringify({{error: "{js_escape(not_found_error)}"}});
 }} else if (lookup.error) {{
     JSON.stringify(lookup);
-}} else {{
-    var {item_var} = lookup.match;
+}}""",
+    )
+
+
+def _build_lookup_script(
+    *,
+    script_prefix: str,
+    lookup_helper_code: str,
+    lookup_setup: str,
+    success_code: str,
+    match_var: str,
+    error_branch: str,
+) -> str:
+    """Build a lookup script with shared OmniFocus setup and success handling."""
+    return (
+        script_prefix
+        + lookup_helper_code
+        + f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+{lookup_setup.rstrip()}
+{error_branch}
+else {{
+    var {match_var} = lookup.match;
 {indent(success_code.rstrip(), "    ")}
 }}
 """
