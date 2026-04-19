@@ -321,19 +321,11 @@ JSON.stringify({
 )
 
 JS_PROJECTS = (
-    JS_PROJECT_STATUS_HELPERS
+    JS_PROJECT_LIST_HELPERS
     + """\
 var doc = Application("OmniFocus").defaultDocument;
 var projects = doc.flattenedProjects().map(function(p) {
-    var f = p.folder();
-    return {
-        id: p.id(),
-        name: p.name(),
-        status: getProjectStatus(p),
-        taskCount: p.flattenedTasks().length,
-        folder: f ? f.name() : null,
-        note: p.note()
-    };
+    return serializeProjectSummary(p);
 });
 JSON.stringify(projects);
 """

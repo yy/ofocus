@@ -317,10 +317,17 @@ def test_js_tasks_excludes_inactive_project_statuses():
 
 
 def test_project_scripts_reuse_shared_status_lookup_helper():
-    assert "status: getProjectStatus(p)" in JS_PROJECTS
+    assert "status: getProjectStatus(project)" in JS_PROJECTS
     assert "status: getProjectStatus(proj)" in JS_SHOW_PROJECT
-    assert "try { s = p.status(); }" not in JS_PROJECTS
+    assert "try { s = project.status(); }" not in JS_PROJECTS
     assert "try { s = proj.status(); }" not in JS_SHOW_PROJECT
+
+
+def test_projects_script_reuses_shared_project_summary_helper():
+    assert "function countRemainingTasks(project)" in JS_PROJECTS
+    assert "function serializeProjectSummary(project)" in JS_PROJECTS
+    assert "return serializeProjectSummary(p);" in JS_PROJECTS
+    assert "taskCount: p.flattenedTasks().length" not in JS_PROJECTS
 
 
 def test_js_due_dates_use_local_date_strings():
