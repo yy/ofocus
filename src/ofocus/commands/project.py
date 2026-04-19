@@ -9,6 +9,7 @@ import click
 from ofocus import jxa
 from ofocus.helpers import (
     annotate_types,
+    build_folder_or_project_lookup_script,
     build_fuzzy_lookup_script,
     build_item_result_stringify,
     check_ambiguous,
@@ -49,43 +50,7 @@ def project(ctx, as_json):
 def ls(folder, as_json):
     """List folders and projects. Optionally drill into a folder by name or ID."""
     if folder:
-        script = (
-            jxa.JS_FUZZY_MATCH
-            + f"""\
-var doc = Application("OmniFocus").defaultDocument;
-var query = "{js_escape(folder)}";
-
-{jxa.JS_SERIALIZE_FOLDER_CONTENTS}
-
-var folderLookup = fuzzyMatch(doc.flattenedFolders, query);
-var result;
-
-if (folderLookup.match) {{
-    result = {{
-        folder: folderLookup.match.name(),
-        children: serializeFolderContents(folderLookup.match)
-    }};
-}} else if (folderLookup.error === "ambiguous") {{
-    result = folderLookup;
-}} else {{
-    // No folder found — try matching a project
-    var projLookup = fuzzyMatch(doc.flattenedProjects, query);
-    if (projLookup.match) {{
-        result = {{
-            error: "is_project",
-            id: projLookup.match.id(),
-            name: projLookup.match.name()
-        }};
-    }} else if (projLookup.error === "ambiguous") {{
-        result = {{error: "ambiguous_project", matches: projLookup.matches}};
-    }} else {{
-        result = {{error: "Folder not found"}};
-    }}
-}}
-
-JSON.stringify(result);
-"""
-        )
+        script = build_folder_or_project_lookup_script(folder)
         result = run_jxa_or_exit(script)
         check_ambiguous(
             result,

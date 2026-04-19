@@ -10,6 +10,7 @@ from ofocus import __version__
 from ofocus.cli import cli
 from ofocus.helpers import (
     annotate_types,
+    build_folder_or_project_lookup_script,
     build_fuzzy_lookup_script,
     build_item_result_stringify,
     build_js_json_stringify,
@@ -138,6 +139,17 @@ def test_build_fuzzy_lookup_script_reuses_shared_scaffold_and_prefix():
     assert script.count('var app = Application("OmniFocus");') == 1
     assert script.count("var doc = app.defaultDocument;") == 1
     assert "else {\n    var item = lookup.match;" in script
+
+
+def test_build_folder_or_project_lookup_script_reuses_shared_snippets():
+    script = build_folder_or_project_lookup_script('Research "Alpha"')
+
+    assert script.count("function fuzzyMatch(collection, query)") == 1
+    assert script.count("function serializeFolderContents(folder)") == 1
+    assert 'var query = "Research \\"Alpha\\"";' in script
+    assert "var folderLookup = fuzzyMatch(doc.flattenedFolders, query);" in script
+    assert "var projLookup = fuzzyMatch(doc.flattenedProjects, query);" in script
+    assert 'result = {error: "Folder not found"};' in script
 
 
 def test_build_js_json_stringify_formats_compact_object_literal():

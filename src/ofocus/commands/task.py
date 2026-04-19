@@ -186,7 +186,10 @@ if (projLookup.error === "not_found") {{
 }} else if (projLookup.error === "ambiguous") {{
     JSON.stringify({{error: "ambiguous_project", matches: projLookup.matches}});
 }} else {{
-    projLookup.match.tasks.push(task);
+    var moveScript = '(() => {{ const t = Task.byIdentifier("' + task.id()
+        + '"); const p = Project.byIdentifier("' + projLookup.match.id()
+        + '"); moveTasks([t], p); }})()';
+    app.evaluateJavascript(moveScript);
 {apply_updates}    var proj = task.containingProject();
     {task_result}
 }}"""

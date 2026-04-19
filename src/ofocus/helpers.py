@@ -277,6 +277,49 @@ if (lookup.error === "not_found") {{
     )
 
 
+def build_folder_or_project_lookup_script(query: str) -> str:
+    """Build the project-ls drill-down script for folders with project fallback."""
+    from ofocus import jxa
+
+    escaped_query = js_escape(query)
+    return (
+        jxa.JS_FUZZY_MATCH
+        + f"""\
+var doc = Application("OmniFocus").defaultDocument;
+var query = "{escaped_query}";
+
+{jxa.JS_SERIALIZE_FOLDER_CONTENTS}
+
+var folderLookup = fuzzyMatch(doc.flattenedFolders, query);
+var result;
+
+if (folderLookup.match) {{
+    result = {{
+        folder: folderLookup.match.name(),
+        children: serializeFolderContents(folderLookup.match)
+    }};
+}} else if (folderLookup.error === "ambiguous") {{
+    result = folderLookup;
+}} else {{
+    var projLookup = fuzzyMatch(doc.flattenedProjects, query);
+    if (projLookup.match) {{
+        result = {{
+            error: "is_project",
+            id: projLookup.match.id(),
+            name: projLookup.match.name()
+        }};
+    }} else if (projLookup.error === "ambiguous") {{
+        result = {{error: "ambiguous_project", matches: projLookup.matches}};
+    }} else {{
+        result = {{error: "Folder not found"}};
+    }}
+}}
+
+JSON.stringify(result);
+"""
+    )
+
+
 def _build_lookup_script(
     *,
     script_prefix: str,
