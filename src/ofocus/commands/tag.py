@@ -3,7 +3,11 @@
 import click
 
 from ofocus import jxa
-from ofocus.helpers import echo_item_list, run_jxa_or_exit, set_subcommand_defaults
+from ofocus.helpers import (
+    echo_item_list,
+    handle_group_json_option,
+    run_jxa_or_exit,
+)
 from ofocus.models import Tag
 
 
@@ -14,8 +18,13 @@ def tag(ctx, as_json):
     """Manage tags."""
     if ctx.invoked_subcommand is None:
         ctx.invoke(ls, as_json=as_json)
-    elif ctx.invoked_subcommand == "ls" and as_json:
-        set_subcommand_defaults(ctx, "ls", as_json=as_json)
+        return
+
+    handle_group_json_option(
+        ctx,
+        as_json=as_json,
+        supported_subcommands=("ls",),
+    )
 
 
 @tag.command("ls")

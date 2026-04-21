@@ -17,13 +17,13 @@ from ofocus.helpers import (
     count_tasks,
     echo_action_result,
     format_task_line,
+    handle_group_json_option,
     js_escape,
     open_omnifocus_item,
     prepare_project_children,
     print_ls_items,
     print_tree,
     run_jxa_or_exit,
-    set_subcommand_defaults,
     strip_internal_fields,
 )
 
@@ -37,11 +37,12 @@ def project(ctx, as_json):
         ctx.invoke(ls, folder=None, as_json=as_json)
         return
 
-    if as_json and ctx.invoked_subcommand == "open":
-        raise click.UsageError("`--json` is not supported by `ofocus project open`.")
-
-    if as_json and ctx.invoked_subcommand in {"ls", "show", "create"}:
-        set_subcommand_defaults(ctx, ctx.invoked_subcommand, as_json=as_json)
+    handle_group_json_option(
+        ctx,
+        as_json=as_json,
+        supported_subcommands=("ls", "show", "create"),
+        unsupported_subcommands=("open",),
+    )
 
 
 @project.command("ls")

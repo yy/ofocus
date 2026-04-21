@@ -3,6 +3,7 @@
 import subprocess
 from types import SimpleNamespace
 
+import click
 import pytest
 from click.testing import CliRunner
 
@@ -26,6 +27,7 @@ from ofocus.helpers import (
     filter_available,
     filter_tree,
     format_task_line,
+    handle_group_json_option,
     js_escape,
     jxa_local_date_constructor,
     load_task_list,
@@ -594,6 +596,41 @@ def test_set_subcommand_defaults_merges_only_explicit_values():
     assert ctx.default_map == {
         "ls": {"tag": "research", "project": "Work", "as_json": True}
     }
+
+
+def test_handle_group_json_option_forwards_supported_subcommand():
+    ctx = SimpleNamespace(
+        invoked_subcommand="show",
+        command_path="ofocus project",
+        default_map=None,
+    )
+
+    forwarded = handle_group_json_option(
+        ctx,
+        as_json=True,
+        supported_subcommands=("show",),
+    )
+
+    assert forwarded is True
+    assert ctx.default_map == {"show": {"as_json": True}}
+
+
+def test_handle_group_json_option_rejects_unsupported_subcommand():
+    ctx = SimpleNamespace(
+        invoked_subcommand="open",
+        command_path="ofocus task",
+        default_map=None,
+    )
+
+    with pytest.raises(
+        click.UsageError,
+        match="`--json` is not supported by `ofocus task open`\\.",
+    ):
+        handle_group_json_option(
+            ctx,
+            as_json=True,
+            unsupported_subcommands=("open",),
+        )
 
 
 def test_echo_action_result_renders_short_id_when_requested(capsys):

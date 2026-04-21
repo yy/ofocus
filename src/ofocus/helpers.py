@@ -205,6 +205,34 @@ def set_subcommand_defaults(
     ctx.default_map.setdefault(subcommand, {}).update(filtered_defaults)
 
 
+def handle_group_json_option(
+    ctx: click.Context,
+    *,
+    as_json: bool,
+    supported_subcommands: Sequence[str] = (),
+    unsupported_subcommands: Sequence[str] = (),
+) -> bool:
+    """Forward group-level ``--json`` to subcommands or reject unsupported ones."""
+    subcommand = ctx.invoked_subcommand
+    if not as_json or subcommand is None:
+        return False
+
+    if subcommand in unsupported_subcommands:
+        group_name = getattr(getattr(ctx, "command", None), "name", None)
+        command_ref = (
+            f"ofocus {group_name} {subcommand}"
+            if group_name
+            else f"{ctx.command_path} {subcommand}"
+        )
+        raise click.UsageError(f"`--json` is not supported by `{command_ref}`.")
+
+    if subcommand in supported_subcommands:
+        set_subcommand_defaults(ctx, subcommand, as_json=True)
+        return True
+
+    return False
+
+
 def echo_action_result(
     result: dict[str, Any],
     action: str,

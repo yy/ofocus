@@ -13,6 +13,7 @@ from ofocus.helpers import (
     build_task_result_stringify,
     echo_action_result,
     echo_task_list,
+    handle_group_json_option,
     js_escape,
     load_task_list,
     load_unique_task_list,
@@ -93,17 +94,12 @@ def task(ctx, project_filter, tag, flagged, due_before, as_json):
             f"{options} can only be used with `ofocus task ls` or bare `ofocus task`."
         )
 
-    if as_json and ctx.invoked_subcommand == "open":
-        raise click.UsageError("`--json` is not supported by `ofocus task open`.")
-
-    if as_json and ctx.invoked_subcommand in {
-        "complete",
-        "update",
-        "drop",
-        "delete",
-        "search",
-    }:
-        set_subcommand_defaults(ctx, ctx.invoked_subcommand, as_json=True)
+    handle_group_json_option(
+        ctx,
+        as_json=as_json,
+        supported_subcommands=("complete", "update", "drop", "delete", "search"),
+        unsupported_subcommands=("open",),
+    )
 
 
 @task.command("ls")

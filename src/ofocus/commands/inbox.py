@@ -8,10 +8,10 @@ from ofocus.helpers import (
     build_task_result_stringify,
     echo_action_result,
     echo_task_list,
+    handle_group_json_option,
     js_escape,
     load_task_list,
     run_jxa_or_exit,
-    set_subcommand_defaults,
 )
 
 
@@ -20,8 +20,11 @@ from ofocus.helpers import (
 @click.pass_context
 def inbox(ctx, as_json):
     """List or manage inbox tasks."""
-    if ctx.invoked_subcommand == "add" and as_json:
-        set_subcommand_defaults(ctx, "add", as_json=as_json)
+    if handle_group_json_option(
+        ctx,
+        as_json=as_json,
+        supported_subcommands=("add",),
+    ):
         return
 
     if ctx.invoked_subcommand is not None:
