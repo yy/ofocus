@@ -54,6 +54,20 @@ function fuzzyMatch(collection, query) {
     for (i = 0; i < items.length; i++) {
         if (items[i].id() === query) return {match: items[i]};
     }
+    if (query === "") {
+        var emptyNames = [];
+        for (i = 0; i < items.length; i++) {
+            if (items[i].name() === "") emptyNames.push(items[i]);
+        }
+        if (emptyNames.length === 1) return {match: emptyNames[0]};
+        if (emptyNames.length > 1) return {
+            error: "ambiguous",
+            matches: emptyNames.map(function(x) {
+                return {id: x.id(), name: x.name()};
+            })
+        };
+        return {error: "not_found"};
+    }
     // ID prefix
     var prefixes = [];
     for (i = 0; i < items.length; i++) {

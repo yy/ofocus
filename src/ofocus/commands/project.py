@@ -12,8 +12,6 @@ from ofocus.helpers import (
     build_folder_or_project_lookup_script,
     build_fuzzy_lookup_script,
     build_item_result_stringify,
-    check_ambiguous,
-    check_result_error,
     count_tasks,
     echo_action_result,
     format_task_line,
@@ -23,6 +21,7 @@ from ofocus.helpers import (
     prepare_project_children,
     print_ls_items,
     print_tree,
+    require_cli_result,
     run_jxa_or_exit,
     strip_internal_fields,
 )
@@ -50,13 +49,13 @@ def project(ctx, as_json):
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def ls(folder, as_json):
     """List folders and projects. Optionally drill into a folder by name or ID."""
-    if folder:
+    if folder is not None:
         script = build_folder_or_project_lookup_script(folder)
-        result = run_jxa_or_exit(script)
-        check_ambiguous(
-            result,
-            "folders",
+        result = require_cli_result(
+            run_jxa_or_exit(script),
+            item_type="folders",
             aliases={"ambiguous_project": "projects"},
+            allowed_errors=("is_project",),
         )
         if result and result.get("error") == "is_project":
             # Redirect to show command
@@ -70,7 +69,6 @@ def ls(folder, as_json):
                 as_json=as_json,
             )
             return
-        check_result_error(result)
         if as_json:
             click.echo(json.dumps(result, indent=2))
         else:
@@ -104,8 +102,7 @@ def show(project, show_all, available, first_available, as_json):
     if not result:
         click.echo("Error: no result from OmniFocus", err=True)
         sys.exit(1)
-    check_ambiguous(result, "projects")
-    check_result_error(result)
+    result = require_cli_result(result, item_type="projects")
 
     children = prepare_project_children(
         result["children"],
@@ -154,8 +151,7 @@ def open_project(project):
         not_found_error="Project not found",
     )
     result = run_jxa_or_exit(script)
-    check_ambiguous(result, "projects")
-    check_result_error(result)
+    result = require_cli_result(result, item_type="projects")
     open_omnifocus_item(result["id"], item_type="project")
     echo_action_result(result, "Opened", as_json=False, fallback_name=project)
 
@@ -166,7 +162,7 @@ def open_project(project):
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def create(name, folder, as_json):
     """Create a new project."""
-    if folder:
+    if folder is not None:
         folder_result = build_item_result_stringify(
             [("folder", "item.name()")],
             target="proj",
@@ -191,9 +187,7 @@ var proj = app.Project({{name: "{js_escape(name)}"}});
 doc.projects.push(proj);
 {project_result}
 """
-    result = run_jxa_or_exit(script)
-    check_ambiguous(result, "folders")
-    check_result_error(result)
+    result = require_cli_result(run_jxa_or_exit(script), item_type="folders")
     echo_action_result(
         result,
         "Created project",

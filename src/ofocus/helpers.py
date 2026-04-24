@@ -403,6 +403,21 @@ def check_result_error(result: dict | None) -> None:
         sys.exit(1)
 
 
+def require_cli_result(
+    result: dict | None,
+    *,
+    item_type: str = "items",
+    aliases: dict[str, str] | None = None,
+    allowed_errors: Sequence[str] = (),
+) -> dict:
+    """Return a CLI result after enforcing shared ambiguous/error handling."""
+    check_ambiguous(result, item_type, aliases=aliases)
+    if result and result.get("error") in allowed_errors:
+        return result
+    check_result_error(result)
+    return result or {}
+
+
 def run_task_lookup_or_exit(
     task_id: str,
     success_code: str,
@@ -418,9 +433,7 @@ def run_task_lookup_or_exit(
             script_prefix=script_prefix,
         )
     )
-    check_ambiguous(result, "tasks", aliases=aliases)
-    check_result_error(result)
-    return result or {}
+    return require_cli_result(result, item_type="tasks", aliases=aliases)
 
 
 def open_omnifocus_item(item_id: str, *, item_type: str = "task") -> None:

@@ -34,6 +34,7 @@ from ofocus.helpers import (
     load_unique_task_list,
     mark_availability,
     print_tree,
+    require_cli_result,
     run_jxa_or_exit,
     set_subcommand_defaults,
     validate_date,
@@ -141,6 +142,20 @@ def test_build_fuzzy_lookup_script_reuses_shared_scaffold_and_prefix():
     assert script.count('var app = Application("OmniFocus");') == 1
     assert script.count("var doc = app.defaultDocument;") == 1
     assert "else {\n    var item = lookup.match;" in script
+
+
+def test_build_fuzzy_lookup_script_special_cases_empty_string_name_matching():
+    script = build_fuzzy_lookup_script(
+        "",
+        "doc.flattenedFolders",
+        "JSON.stringify({id: item.id(), name: item.name()});",
+        not_found_error="Folder not found",
+    )
+
+    assert 'if (query === "") {' in script
+    assert 'if (items[i].name() === "") emptyNames.push(items[i]);' in script
+    assert "emptyNames.length === 1" in script
+    assert script.index('if (query === "") {') < script.index("// ID prefix")
 
 
 def test_build_folder_or_project_lookup_script_reuses_shared_snippets():
@@ -658,6 +673,25 @@ def test_check_ambiguous_accepts_alias_errors(capsys):
         )
 
     assert "Multiple projects match" in capsys.readouterr().err
+
+
+def test_require_cli_result_allows_expected_sentinel_error():
+    assert require_cli_result(
+        {"error": "is_project", "id": "proj1"},
+        item_type="folders",
+        allowed_errors=("is_project",),
+    ) == {"error": "is_project", "id": "proj1"}
+
+
+def test_require_cli_result_exits_on_unexpected_error(capsys):
+    with pytest.raises(SystemExit):
+        require_cli_result(
+            {"error": "Folder not found"},
+            item_type="folders",
+            allowed_errors=("is_project",),
+        )
+
+    assert "Folder not found" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
@@ -1803,6 +1837,25 @@ def test_ls_drill_into_folder(monkeypatch):
     assert "Paper writing" in result.output
 
 
+def test_ls_empty_string_folder_uses_lookup_path(monkeypatch):
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        return {"folder": "", "children": []}
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "ls", ""])
+
+    assert result.exit_code == 0
+    assert len(scripts) == 1
+    assert 'var query = "";' in scripts[0]
+    assert "doc.flattenedFolders" in scripts[0]
+    assert "doc.flattenedProjects" in scripts[0]
+    assert result.output == "/\n"
+
+
 def test_ls_folder_not_found(monkeypatch):
     def fake_run_jxa(_script):
         return {"error": "Folder not found"}
@@ -1926,6 +1979,26 @@ def test_project_create_folder_uses_shared_fuzzy_lookup_script(monkeypatch):
     assert "var item = lookup.match;" in scripts[0]
     assert 'var proj = app.Project({name: "Test Project"});' in scripts[0]
     assert "item.projects.push(proj);" in scripts[0]
+
+
+def test_project_create_empty_string_folder_uses_folder_lookup(monkeypatch):
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        return {"id": "p1", "name": "Test Project", "folder": ""}
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["project", "create", "Test Project", "--folder", "", "--json"]
+    )
+
+    assert result.exit_code == 0
+    assert len(scripts) == 1
+    assert 'fuzzyMatch(doc.flattenedFolders, "")' in scripts[0]
+    assert "item.projects.push(proj);" in scripts[0]
+    assert 'JSON.stringify({error: "Folder not found: "});' in scripts[0]
 
 
 # ── Availability helpers ──────────────────────────────────────────────
