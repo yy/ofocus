@@ -111,10 +111,15 @@ def task(ctx, project_filter, tag, flagged, due_before, as_json):
 def ls(project, tag, flagged, due_before, as_json):
     """List active tasks."""
     task_list = load_task_list(jxa.JS_TASKS)
-    if project:
-        task_list = [
-            t for t in task_list if t.project and project.lower() in t.project.lower()
-        ]
+    if project is not None:
+        if project == "":
+            task_list = [t for t in task_list if t.project == ""]
+        else:
+            task_list = [
+                t
+                for t in task_list
+                if t.project and project.lower() in t.project.lower()
+            ]
     if tag:
         task_list = [
             t for t in task_list if any(tag.lower() in tg.lower() for tg in t.tags)

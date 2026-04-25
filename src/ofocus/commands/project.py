@@ -2,6 +2,7 @@
 
 import json
 import sys
+from copy import deepcopy
 from datetime import date
 
 import click
@@ -42,6 +43,30 @@ def project(ctx, as_json):
         supported_subcommands=("ls", "show", "create"),
         unsupported_subcommands=("open",),
     )
+
+
+def _build_project_show_response(result: dict, children: list[dict]) -> dict:
+    """Build the JSON payload for ``project show`` without mutating the tree."""
+    response = dict(result)
+    response["children"] = deepcopy(children)
+    remaining, total = count_tasks(response["children"])
+    response["remaining"] = remaining
+    response["total"] = total
+    strip_internal_fields(response["children"])
+    annotate_types(response["children"])
+    return response
+
+
+def _echo_first_available_tasks(project_name: str, children: list[dict]) -> None:
+    """Render the ``project show --first`` text output."""
+    if not children:
+        click.echo(f"{project_name}  — no available tasks")
+        return
+
+    click.echo(f"{project_name}  — first available:")
+    for task_node in children:
+        line = format_task_line(task_node)
+        click.echo(f"  {task_node['id'][:8]}  {line}")
 
 
 @project.command("ls")
@@ -115,24 +140,11 @@ def show(project, show_all, available, first_available, as_json):
 
     if first_available:
         if not as_json:
-            if not children:
-                click.echo(f"{result['name']}  — no available tasks")
-            else:
-                click.echo(f"{result['name']}  — first available:")
-                for task_node in children:
-                    line = format_task_line(task_node)
-                    click.echo(f"  {task_node['id'][:8]}  {line}")
+            _echo_first_available_tasks(result["name"], children)
             return
 
     if as_json:
-        response = dict(result)
-        response["children"] = children
-        remaining, total = count_tasks(children)
-        response["remaining"] = remaining
-        response["total"] = total
-        strip_internal_fields(response["children"])
-        annotate_types(response["children"])
-        click.echo(json.dumps(response, indent=2))
+        click.echo(json.dumps(_build_project_show_response(result, children), indent=2))
     else:
         remaining, total = count_tasks(children)
         click.echo(f"{result['name']}  ({remaining}/{total} remaining)")

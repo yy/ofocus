@@ -9,6 +9,7 @@ from click.testing import CliRunner
 
 from ofocus import __version__
 from ofocus.cli import cli
+from ofocus.commands.project import _build_project_show_response
 from ofocus.helpers import (
     annotate_types,
     build_folder_or_project_lookup_script,
@@ -1067,6 +1068,34 @@ def test_tasks_due_before_uses_local_dates_in_json(monkeypatch):
     )
 
 
+def test_task_ls_empty_string_project_filter_is_not_treated_as_no_filter(monkeypatch):
+    def fake_run_jxa(_script):
+        return [
+            {"id": "a1", "name": "Empty project task", "project": ""},
+            {"id": "a2", "name": "Work task", "project": "Work"},
+        ]
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["task", "ls", "--project", "", "--json"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == (
+        "[\n"
+        "  {\n"
+        '    "id": "a1",\n'
+        '    "name": "Empty project task",\n'
+        '    "flagged": false,\n'
+        '    "completed": false,\n'
+        '    "dueDate": null,\n'
+        '    "note": null,\n'
+        '    "project": "",\n'
+        '    "tags": []\n'
+        "  }\n"
+        "]"
+    )
+
+
 def test_task_search_dedupes_inbox_and_active_results(monkeypatch):
     def fake_run_jxa(script):
         if script == JS_TASKS:
@@ -1554,6 +1583,33 @@ def test_show_json_output(monkeypatch):
     assert data["remaining"] == 1
     assert data["total"] == 1
     assert data["children"][0]["type"] == "task"
+
+
+def test_build_project_show_response_keeps_source_tree_unmodified():
+    result = {"id": "proj1", "name": "P"}
+    children = [
+        {
+            "id": "t1",
+            "name": "First",
+            "flagged": False,
+            "completed": False,
+            "dropped": False,
+            "dueDate": None,
+            "note": "",
+            "tags": [],
+            "_available": True,
+            "children": [],
+        }
+    ]
+
+    response = _build_project_show_response(result, children)
+
+    assert response["remaining"] == 1
+    assert response["total"] == 1
+    assert response["children"][0]["type"] == "task"
+    assert "_available" not in response["children"][0]
+    assert "_available" in children[0]
+    assert "type" not in children[0]
 
 
 def test_show_ambiguous_project(monkeypatch):
