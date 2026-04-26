@@ -335,11 +335,41 @@ JSON.stringify({
 )
 
 JS_PROJECTS = (
-    JS_PROJECT_LIST_HELPERS
+    JS_PROJECT_STATUS_HELPERS
     + """\
 var doc = Application("OmniFocus").defaultDocument;
-var projects = doc.flattenedProjects().map(function(p) {
-    return serializeProjectSummary(p);
+
+function countProjectTasksById() {
+    var ids = doc.flattenedTasks.id();
+    var completed = doc.flattenedTasks.completed();
+    var dropped = doc.flattenedTasks.dropped();
+    var projectNames = doc.flattenedTasks.containingProject.name();
+    var projectIds = doc.flattenedTasks.containingProject.id();
+    var counts = {};
+    for (var i = 0; i < ids.length; i++) {
+        if (
+            !projectNames[i] ||
+            ids[i] === projectIds[i] ||
+            completed[i] ||
+            dropped[i]
+        ) {
+            continue;
+        }
+        counts[projectIds[i]] = (counts[projectIds[i]] || 0) + 1;
+    }
+    return counts;
+}
+
+var taskCounts = countProjectTasksById();
+var projects = doc.flattenedProjects().map(function(project) {
+    var id = project.id();
+    return {
+        type: "project",
+        id: id,
+        name: project.name(),
+        status: getProjectStatus(project),
+        taskCount: taskCounts[id] || 0
+    };
 });
 JSON.stringify(projects);
 """

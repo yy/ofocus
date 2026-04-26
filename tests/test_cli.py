@@ -26,6 +26,7 @@ from ofocus.helpers import (
     echo_action_result,
     echo_task_list,
     filter_available,
+    filter_tasks,
     filter_tree,
     format_task_line,
     handle_group_json_option,
@@ -353,11 +354,13 @@ def test_project_scripts_reuse_shared_status_lookup_helper():
     assert "try { s = proj.status(); }" not in JS_SHOW_PROJECT
 
 
-def test_projects_script_reuses_shared_project_summary_helper():
-    assert "function countRemainingTasks(project)" in JS_PROJECTS
-    assert "function serializeProjectSummary(project)" in JS_PROJECTS
-    assert "return serializeProjectSummary(p);" in JS_PROJECTS
-    assert "taskCount: p.flattenedTasks().length" not in JS_PROJECTS
+def test_js_projects_precomputes_task_counts_from_scalar_arrays():
+    assert "function countProjectTasksById()" in JS_PROJECTS
+    assert "doc.flattenedTasks.id()" in JS_PROJECTS
+    assert "doc.flattenedTasks.containingProject.id()" in JS_PROJECTS
+    assert "taskCount: taskCounts[id] || 0" in JS_PROJECTS
+    assert "project.flattenedTasks().filter" not in JS_PROJECTS
+    assert "return serializeProjectSummary(p);" not in JS_PROJECTS
 
 
 def test_js_due_dates_use_local_date_strings():
@@ -595,6 +598,65 @@ def test_echo_task_list_renders_text(capsys):
     assert capsys.readouterr().out == (
         "2 tasks:\n  abc12345  * Read paper\n  def67890  Email advisor\n"
     )
+
+
+def test_filter_tasks_combines_task_ls_filters():
+    tasks = [
+        Task(
+            id="a1",
+            name="Match",
+            project="Work",
+            tags=["Urgent"],
+            flagged=True,
+            due_date="2026-03-10",
+        ),
+        Task(
+            id="a2",
+            name="Too late",
+            project="Work",
+            tags=["Urgent"],
+            flagged=True,
+            due_date="2026-03-11",
+        ),
+        Task(
+            id="a3",
+            name="Wrong tag",
+            project="Work",
+            tags=["Later"],
+            flagged=True,
+            due_date="2026-03-10",
+        ),
+        Task(
+            id="a4",
+            name="Unflagged",
+            project="Work",
+            tags=["Urgent"],
+            flagged=False,
+            due_date="2026-03-10",
+        ),
+    ]
+
+    filtered = filter_tasks(
+        tasks,
+        project="wor",
+        tag="urgent",
+        flagged=True,
+        due_before="2026-03-10",
+    )
+
+    assert [task.id for task in filtered] == ["a1"]
+
+
+def test_filter_tasks_keeps_empty_string_project_lookup_explicit():
+    tasks = [
+        Task(id="a1", name="Empty project task", project=""),
+        Task(id="a2", name="Missing project task", project=None),
+        Task(id="a3", name="Work task", project="Work"),
+    ]
+
+    filtered = filter_tasks(tasks, project="")
+
+    assert [task.id for task in filtered] == ["a1"]
 
 
 def test_set_subcommand_defaults_merges_only_explicit_values():
@@ -1066,6 +1128,18 @@ def test_tasks_due_before_uses_local_dates_in_json(monkeypatch):
         "  }\n"
         "]"
     )
+
+
+def test_tasks_due_before_rejects_empty_string(monkeypatch):
+    def fake_run_jxa(_script):
+        return [{"id": "a1", "name": "Today", "dueDate": "2026-03-10"}]
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["task", "ls", "--due-before", "", "--json"])
+
+    assert result.exit_code == 1
+    assert "Error: date must be YYYY-MM-DD format" in result.output
 
 
 def test_task_ls_empty_string_project_filter_is_not_treated_as_no_filter(monkeypatch):

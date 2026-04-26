@@ -173,6 +173,43 @@ def load_unique_task_list(*scripts: str) -> list[Task]:
     return tasks
 
 
+def filter_tasks(
+    tasks: Sequence[Task],
+    *,
+    project: str | None = None,
+    tag: str | None = None,
+    flagged: bool = False,
+    due_before: str | None = None,
+) -> list[Task]:
+    """Apply task-list filters used by ``ofocus task ls``."""
+    filtered = list(tasks)
+    if project is not None:
+        if project == "":
+            filtered = [task for task in filtered if task.project == ""]
+        else:
+            filtered = [
+                task
+                for task in filtered
+                if task.project and project.lower() in task.project.lower()
+            ]
+    if tag:
+        filtered = [
+            task
+            for task in filtered
+            if any(tag.lower() in task_tag.lower() for task_tag in task.tags)
+        ]
+    if flagged:
+        filtered = [task for task in filtered if task.flagged]
+    if due_before is not None:
+        due_before = validate_date(due_before)
+        filtered = [
+            task
+            for task in filtered
+            if task.due_date and task.due_date[:10] <= due_before
+        ]
+    return filtered
+
+
 def echo_item_list(items: Sequence[RenderableItem], label: str, as_json: bool) -> None:
     """Render a model collection using the CLI's standard text or JSON format."""
     if as_json:

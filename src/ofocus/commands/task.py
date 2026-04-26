@@ -13,6 +13,7 @@ from ofocus.helpers import (
     build_task_result_stringify,
     echo_action_result,
     echo_task_list,
+    filter_tasks,
     handle_group_json_option,
     js_escape,
     load_task_list,
@@ -20,7 +21,6 @@ from ofocus.helpers import (
     open_omnifocus_item,
     run_task_lookup_or_exit,
     set_subcommand_defaults,
-    validate_date,
     validate_task_id,
 )
 
@@ -111,26 +111,13 @@ def task(ctx, project_filter, tag, flagged, due_before, as_json):
 def ls(project, tag, flagged, due_before, as_json):
     """List active tasks."""
     task_list = load_task_list(jxa.JS_TASKS)
-    if project is not None:
-        if project == "":
-            task_list = [t for t in task_list if t.project == ""]
-        else:
-            task_list = [
-                t
-                for t in task_list
-                if t.project and project.lower() in t.project.lower()
-            ]
-    if tag:
-        task_list = [
-            t for t in task_list if any(tag.lower() in tg.lower() for tg in t.tags)
-        ]
-    if flagged:
-        task_list = [t for t in task_list if t.flagged]
-    if due_before:
-        due_before = validate_date(due_before)
-        task_list = [
-            t for t in task_list if t.due_date and t.due_date[:10] <= due_before
-        ]
+    task_list = filter_tasks(
+        task_list,
+        project=project,
+        tag=tag,
+        flagged=flagged,
+        due_before=due_before,
+    )
     echo_task_list(task_list, "tasks", as_json)
 
 
