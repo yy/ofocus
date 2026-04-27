@@ -10,6 +10,7 @@ from click.testing import CliRunner
 from ofocus import __version__
 from ofocus.cli import cli
 from ofocus.commands.project import _build_project_show_response
+from ofocus.commands.task import _build_task_update_success_code
 from ofocus.helpers import (
     annotate_types,
     build_folder_or_project_lookup_script,
@@ -205,6 +206,41 @@ def test_build_task_action_success_code_appends_standard_result_payload():
             "JSON.stringify({id: task.id(), name: task.name(), completed: true});",
         ]
     )
+
+
+def test_build_task_update_success_code_without_project_keeps_update_then_result():
+    success_code = _build_task_update_success_code(
+        ['task.name = "Renamed";', "task.flagged = true;"],
+        project=None,
+    )
+
+    assert success_code == "\n".join(
+        [
+            'task.name = "Renamed";',
+            "task.flagged = true;",
+            "var proj = task.containingProject();",
+            (
+                "JSON.stringify({id: task.id(), name: task.name(), "
+                "flagged: task.flagged(), project: proj ? proj.name() : null});"
+            ),
+        ]
+    )
+
+
+def test_build_task_update_success_code_with_project_moves_before_updates():
+    success_code = _build_task_update_success_code(
+        ['task.name = "Renamed";'],
+        project='Paper "Draft"',
+    )
+
+    assert 'fuzzyMatch(doc.flattenedProjects, "Paper \\"Draft\\"")' in success_code
+    assert 'JSON.stringify({error: "Project not found"});' in success_code
+    assert 'error: "ambiguous_project", matches: projLookup.matches' in success_code
+    assert "app.evaluateJavascript(moveScript);" in success_code
+    move_index = success_code.index("app.evaluateJavascript(moveScript);")
+    update_index = success_code.index('    task.name = "Renamed";')
+    assert move_index < update_index
+    assert "project: proj ? proj.name() : null" in success_code
 
 
 def test_build_task_lookup_script_uses_global_scalar_prefix_scan():

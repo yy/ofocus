@@ -42,6 +42,38 @@ def _run_task_action(
     )
 
 
+def _build_task_update_success_code(updates: list[str], project: str | None) -> str:
+    """Build the task update JXA block after the task lookup succeeds."""
+    update_code = "\n".join(updates)
+    task_result = build_task_result_stringify(
+        [
+            ("flagged", "task.flagged()"),
+            ("project", "proj ? proj.name() : null"),
+        ]
+    )
+    if project is None:
+        return f"""\
+{update_code}
+var proj = task.containingProject();
+{task_result}"""
+
+    apply_updates = f"{indent(update_code, '    ')}\n" if update_code else ""
+    return f"""\
+var projLookup = fuzzyMatch(doc.flattenedProjects, "{js_escape(project)}");
+if (projLookup.error === "not_found") {{
+    JSON.stringify({{error: "Project not found"}});
+}} else if (projLookup.error === "ambiguous") {{
+    JSON.stringify({{error: "ambiguous_project", matches: projLookup.matches}});
+}} else {{
+    var moveScript = '(() => {{ const t = Task.byIdentifier("' + task.id()
+        + '"); const p = Project.byIdentifier("' + projLookup.match.id()
+        + '"); moveTasks([t], p); }})()';
+    app.evaluateJavascript(moveScript);
+{apply_updates}    var proj = task.containingProject();
+    {task_result}
+}}"""
+
+
 @click.group(invoke_without_command=True)
 @click.option(
     "--project",
@@ -152,40 +184,11 @@ def update(task_id, name, due, flag, note, project, as_json):
         flag=flag,
         note=note,
     )
-    script_prefix = ""
-    if project is not None:
-        script_prefix = jxa.JS_FUZZY_MATCH
     if not updates and project is None:
         click.echo("No updates specified.", err=True)
         sys.exit(1)
-    update_code = "\n".join(updates)
-    task_result = build_task_result_stringify(
-        [
-            ("flagged", "task.flagged()"),
-            ("project", "proj ? proj.name() : null"),
-        ]
-    )
-    if project is not None:
-        apply_updates = f"{indent(update_code, '    ')}\n" if update_code else ""
-        success_code = f"""\
-var projLookup = fuzzyMatch(doc.flattenedProjects, "{js_escape(project)}");
-if (projLookup.error === "not_found") {{
-    JSON.stringify({{error: "Project not found"}});
-}} else if (projLookup.error === "ambiguous") {{
-    JSON.stringify({{error: "ambiguous_project", matches: projLookup.matches}});
-}} else {{
-    var moveScript = '(() => {{ const t = Task.byIdentifier("' + task.id()
-        + '"); const p = Project.byIdentifier("' + projLookup.match.id()
-        + '"); moveTasks([t], p); }})()';
-    app.evaluateJavascript(moveScript);
-{apply_updates}    var proj = task.containingProject();
-    {task_result}
-}}"""
-    else:
-        success_code = f"""\
-{update_code}
-var proj = task.containingProject();
-{task_result}"""
+    script_prefix = jxa.JS_FUZZY_MATCH if project is not None else ""
+    success_code = _build_task_update_success_code(updates, project)
     result = _run_task_action(
         task_id,
         success_code,
