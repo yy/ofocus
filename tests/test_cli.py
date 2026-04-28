@@ -1027,6 +1027,18 @@ def test_inbox_add_due_uses_local_date_constructor(monkeypatch):
     assert 'new Date("2026-03-15")' not in scripts[0]
 
 
+def test_inbox_add_due_rejects_empty_string(monkeypatch):
+    def fail_run_jxa(_script):
+        raise AssertionError("inbox add should reject an empty due date before JXA")
+
+    monkeypatch.setattr(_PATCH_JXA, fail_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["inbox", "add", "Read paper", "--due", ""])
+
+    assert result.exit_code == 1
+    assert "Error: date must be YYYY-MM-DD format" in result.output
+
+
 def test_inbox_add_honors_group_level_json_shorthand(monkeypatch):
     def fake_run_jxa(_script):
         return {"id": "abc12345", "name": "Read paper"}

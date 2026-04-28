@@ -43,7 +43,7 @@ def inbox_add(name, note, due, flag, as_json):
     """Add a task to the inbox."""
     assignments = build_task_field_assignments(
         note=note if note else None,
-        due=due if due else None,
+        due=due,
         flag=True if flag else None,
     )
     assignment_block = "\n".join(assignments)
