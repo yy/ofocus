@@ -1,7 +1,5 @@
 """Click CLI for OmniFocus."""
 
-import json
-
 import click
 
 from ofocus import __version__, jxa
@@ -9,7 +7,7 @@ from ofocus.commands.inbox import inbox
 from ofocus.commands.project import project
 from ofocus.commands.tag import tag
 from ofocus.commands.task import task
-from ofocus.helpers import run_jxa_or_exit
+from ofocus.helpers import echo_json, run_jxa_or_exit
 
 # ── CLI ──────────────────────────────────────────────────────────────────
 
@@ -35,7 +33,7 @@ def stats(as_json):
     """Show quick counts."""
     result = run_jxa_or_exit(jxa.JS_STATS)
     if as_json:
-        click.echo(json.dumps(result, indent=2))
+        echo_json(result)
     else:
         click.echo(f"Inbox:    {result['inbox']}")
         click.echo(f"Active:   {result['active']}")
@@ -65,7 +63,7 @@ def dump(as_json):
         "tags": tags_raw or [],
         "folders": folders_raw or [],
     }
-    click.echo(json.dumps(result, indent=2))
+    echo_json(result)
 
 
 # ── Usage ────────────────────────────────────────────────────────────────

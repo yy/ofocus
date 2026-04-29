@@ -25,6 +25,7 @@ from ofocus.helpers import (
     collect_first_available,
     count_tasks,
     echo_action_result,
+    echo_json,
     echo_task_list,
     filter_available,
     filter_tasks,
@@ -633,6 +634,21 @@ def test_echo_task_list_renders_text(capsys):
 
     assert capsys.readouterr().out == (
         "2 tasks:\n  abc12345  * Read paper\n  def67890  Email advisor\n"
+    )
+
+
+def test_echo_json_uses_cli_standard_indentation(capsys):
+    echo_json({"id": "abc12345", "items": [{"name": "Read paper"}]})
+
+    assert capsys.readouterr().out == (
+        "{\n"
+        '  "id": "abc12345",\n'
+        '  "items": [\n'
+        "    {\n"
+        '      "name": "Read paper"\n'
+        "    }\n"
+        "  ]\n"
+        "}\n"
     )
 
 

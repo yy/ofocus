@@ -1,6 +1,5 @@
 """Project subcommand group."""
 
-import json
 import sys
 from copy import deepcopy
 from datetime import date
@@ -15,6 +14,7 @@ from ofocus.helpers import (
     build_item_result_stringify,
     count_tasks,
     echo_action_result,
+    echo_json,
     format_task_line,
     handle_group_json_option,
     js_escape,
@@ -95,14 +95,14 @@ def ls(folder, as_json):
             )
             return
         if as_json:
-            click.echo(json.dumps(result, indent=2))
+            echo_json(result)
         else:
             click.echo(f"{result['folder']}/")
             print_ls_items(result.get("children", []))
     else:
         raw = run_jxa_or_exit(jxa.JS_TOP_LEVEL)
         if as_json:
-            click.echo(json.dumps(raw, indent=2))
+            echo_json(raw)
         else:
             print_ls_items(raw or [])
 
@@ -144,7 +144,7 @@ def show(project, show_all, available, first_available, as_json):
             return
 
     if as_json:
-        click.echo(json.dumps(_build_project_show_response(result, children), indent=2))
+        echo_json(_build_project_show_response(result, children))
     else:
         remaining, total = count_tasks(children)
         click.echo(f"{result['name']}  ({remaining}/{total} remaining)")

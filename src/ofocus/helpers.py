@@ -210,10 +210,15 @@ def filter_tasks(
     return filtered
 
 
+def echo_json(value: Any) -> None:
+    """Render JSON using the CLI's standard indentation."""
+    click.echo(json.dumps(value, indent=2))
+
+
 def echo_item_list(items: Sequence[RenderableItem], label: str, as_json: bool) -> None:
     """Render a model collection using the CLI's standard text or JSON format."""
     if as_json:
-        click.echo(json.dumps([item.to_dict() for item in items], indent=2))
+        echo_json([item.to_dict() for item in items])
         return
 
     click.echo(f"{len(items)} {label}:")
@@ -280,7 +285,7 @@ def echo_action_result(
 ) -> None:
     """Render a single-item command result using the standard text/JSON formats."""
     if as_json:
-        click.echo(json.dumps(result, indent=2))
+        echo_json(result)
         return
 
     name = result.get("name", fallback_name or "?")
