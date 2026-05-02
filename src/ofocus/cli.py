@@ -46,24 +46,31 @@ def stats(as_json):
 # ── Dump ─────────────────────────────────────────────────────────────────
 
 
+_DUMP_SCRIPT_SEQUENCE = (
+    ("tasks", jxa.JS_TASKS),
+    ("projects", jxa.JS_PROJECTS),
+    ("tags", jxa.JS_TAGS),
+    ("inbox", jxa.JS_INBOX),
+    ("folders", jxa.JS_FOLDERS),
+)
+_DUMP_OUTPUT_ORDER = ("inbox", "tasks", "projects", "tags", "folders")
+
+
+def _load_dump_payload() -> dict[str, list]:
+    """Load all dump sections while preserving the CLI's JSON output order."""
+    loaded = {
+        section: run_jxa_or_exit(script) or []
+        for section, script in _DUMP_SCRIPT_SEQUENCE
+    }
+    return {section: loaded[section] for section in _DUMP_OUTPUT_ORDER}
+
+
 @cli.command()
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def dump(as_json):
     """Full JSON dump of all active tasks, projects, tags."""
     del as_json  # `dump` is always JSON, but accept the flag for CLI consistency.
-    tasks_raw = run_jxa_or_exit(jxa.JS_TASKS)
-    projects_raw = run_jxa_or_exit(jxa.JS_PROJECTS)
-    tags_raw = run_jxa_or_exit(jxa.JS_TAGS)
-    inbox_raw = run_jxa_or_exit(jxa.JS_INBOX)
-    folders_raw = run_jxa_or_exit(jxa.JS_FOLDERS)
-    result = {
-        "inbox": inbox_raw or [],
-        "tasks": tasks_raw or [],
-        "projects": projects_raw or [],
-        "tags": tags_raw or [],
-        "folders": folders_raw or [],
-    }
-    echo_json(result)
+    echo_json(_load_dump_payload())
 
 
 # ── Usage ────────────────────────────────────────────────────────────────

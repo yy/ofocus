@@ -46,12 +46,14 @@ from ofocus.helpers import (
 )
 from ofocus.jxa import (
     JS_ACTION_TASK_HELPERS,
+    JS_FOLDERS,
     JS_INBOX,
     JS_PROJECT_STATUS_HELPERS,
     JS_PROJECTS,
     JS_SERIALIZE_FOLDER_CONTENTS,
     JS_SHOW_PROJECT,
     JS_STATS,
+    JS_TAGS,
     JS_TASKS,
     JS_TOP_LEVEL,
     run_jxa,
@@ -1234,6 +1236,37 @@ def test_task_ls_empty_string_project_filter_is_not_treated_as_no_filter(monkeyp
     )
 
 
+def test_task_ls_empty_string_tag_filter_is_not_treated_as_no_filter(monkeypatch):
+    def fake_run_jxa(_script):
+        return [
+            {"id": "a1", "name": "Untagged task", "tags": []},
+            {"id": "a2", "name": "Tagged task", "tags": ["work"]},
+            {"id": "a3", "name": "Empty tag task", "tags": [""]},
+        ]
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["task", "ls", "--tag", "", "--json"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == (
+        "[\n"
+        "  {\n"
+        '    "id": "a3",\n'
+        '    "name": "Empty tag task",\n'
+        '    "flagged": false,\n'
+        '    "completed": false,\n'
+        '    "dueDate": null,\n'
+        '    "note": null,\n'
+        '    "project": null,\n'
+        '    "tags": [\n'
+        '      ""\n'
+        "    ]\n"
+        "  }\n"
+        "]"
+    )
+
+
 def test_task_search_dedupes_inbox_and_active_results(monkeypatch):
     def fake_run_jxa(script):
         if script == JS_TASKS:
@@ -1274,33 +1307,23 @@ def test_task_search_dedupes_inbox_and_active_results(monkeypatch):
 def test_dump_accepts_json_flag(monkeypatch):
     responses = {
         JS_TASKS: [{"id": "t1", "name": "Task"}],
-        "projects": [{"id": "p1", "name": "Project"}],
-        "tags": [{"id": "g1", "name": "Tag"}],
+        JS_PROJECTS: [{"id": "p1", "name": "Project"}],
+        JS_TAGS: [{"id": "g1", "name": "Tag"}],
         JS_INBOX: [{"id": "i1", "name": "Inbox"}],
-        "folders": [{"id": "f1", "name": "Folder"}],
+        JS_FOLDERS: [{"id": "f1", "name": "Folder"}],
     }
     scripts = []
 
     def fake_run_jxa(script):
         scripts.append(script)
-        if script == JS_TASKS:
-            return responses[JS_TASKS]
-        if script == JS_INBOX:
-            return responses[JS_INBOX]
-        if "flattenedProjects" in script:
-            return responses["projects"]
-        if "flattenedTags" in script:
-            return responses["tags"]
-        if "flattenedFolders" in script:
-            return responses["folders"]
-        raise AssertionError(f"Unexpected script: {script}")
+        return responses[script]
 
     monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
     result = runner.invoke(cli, ["dump", "--json"])
 
     assert result.exit_code == 0
-    assert len(scripts) == 5
+    assert scripts == [JS_TASKS, JS_PROJECTS, JS_TAGS, JS_INBOX, JS_FOLDERS]
     assert result.output.strip() == (
         "{\n"
         '  "inbox": [\n'

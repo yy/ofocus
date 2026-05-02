@@ -192,12 +192,15 @@ def filter_tasks(
                 for task in filtered
                 if task.project and project.lower() in task.project.lower()
             ]
-    if tag:
-        filtered = [
-            task
-            for task in filtered
-            if any(tag.lower() in task_tag.lower() for task_tag in task.tags)
-        ]
+    if tag is not None:
+        if tag == "":
+            filtered = [task for task in filtered if "" in task.tags]
+        else:
+            filtered = [
+                task
+                for task in filtered
+                if any(tag.lower() in task_tag.lower() for task_tag in task.tags)
+            ]
     if flagged:
         filtered = [task for task in filtered if task.flagged]
     if due_before is not None:
