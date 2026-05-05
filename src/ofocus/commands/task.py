@@ -251,6 +251,9 @@ def open_task(task_id):
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def search(query, as_json):
     """Search tasks by name (includes inbox and active tasks)."""
+    if not query.strip():
+        click.echo("Error: search query cannot be empty", err=True)
+        sys.exit(1)
     task_list = load_unique_task_list(jxa.JS_TASKS, jxa.JS_INBOX)
     q = query.lower()
     matches = [

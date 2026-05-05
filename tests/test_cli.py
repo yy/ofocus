@@ -1313,6 +1313,18 @@ def test_task_search_dedupes_inbox_and_active_results(monkeypatch):
     assert result.output == "1 matches:\n  abc12345  Read paper [Research]\n"
 
 
+def test_task_search_rejects_empty_query(monkeypatch):
+    def fail_run_jxa(_script):
+        raise AssertionError("task search should reject an empty query before JXA")
+
+    monkeypatch.setattr(_PATCH_JXA, fail_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["task", "search", ""])
+
+    assert result.exit_code == 1
+    assert "Error: search query cannot be empty" in result.output
+
+
 def test_dump_accepts_json_flag(monkeypatch):
     responses = {
         JS_TASKS: [{"id": "t1", "name": "Task"}],
