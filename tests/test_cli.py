@@ -41,6 +41,7 @@ from ofocus.helpers import (
     require_cli_result,
     run_jxa_or_exit,
     set_subcommand_defaults,
+    short_id,
     validate_date,
     validate_task_id,
 )
@@ -637,6 +638,14 @@ def test_echo_task_list_renders_text(capsys):
     assert capsys.readouterr().out == (
         "2 tasks:\n  abc12345  * Read paper\n  def67890  Email advisor\n"
     )
+
+
+def test_short_id_uses_cli_display_width():
+    assert short_id("j7cpqVlu3kR") == "j7cpqVlu"
+
+
+def test_short_id_falls_back_for_missing_id():
+    assert short_id(None) == "?"
 
 
 def test_echo_json_uses_cli_standard_indentation(capsys):

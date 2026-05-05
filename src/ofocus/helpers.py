@@ -218,6 +218,11 @@ def echo_json(value: Any) -> None:
     click.echo(json.dumps(value, indent=2))
 
 
+def short_id(item_id: str | None) -> str:
+    """Return the CLI's standard shortened OmniFocus ID."""
+    return (item_id or "?")[:8]
+
+
 def echo_item_list(items: Sequence[RenderableItem], label: str, as_json: bool) -> None:
     """Render a model collection using the CLI's standard text or JSON format."""
     if as_json:
@@ -226,7 +231,7 @@ def echo_item_list(items: Sequence[RenderableItem], label: str, as_json: bool) -
 
     click.echo(f"{len(items)} {label}:")
     for item in items:
-        click.echo(f"  {item.id[:8]}  {item.to_line()}")
+        click.echo(f"  {short_id(item.id)}  {item.to_line()}")
 
 
 def echo_task_list(tasks: list[Task], label: str, as_json: bool) -> None:
@@ -293,7 +298,7 @@ def echo_action_result(
 
     name = result.get("name", fallback_name or "?")
     if include_id:
-        click.echo(f"{action}: {name} ({result.get('id', '?')[:8]})")
+        click.echo(f"{action}: {name} ({short_id(result.get('id'))})")
         return
 
     click.echo(f"{action}: {name}")
@@ -437,7 +442,7 @@ def check_ambiguous(
 
     click.echo(f"Multiple {matched_item_type} match. Be more specific:", err=True)
     for m in result["matches"]:
-        click.echo(f"  {m['id'][:8]}  {m['name']}", err=True)
+        click.echo(f"  {short_id(m['id'])}  {m['name']}", err=True)
     sys.exit(1)
 
 
@@ -503,7 +508,7 @@ def print_ls_items(items: list[dict]):
             total = item["projectCount"]
             click.echo(
                 "  "
-                f"{item['id'][:8]}  {item['name']}/  "
+                f"{short_id(item['id'])}  {item['name']}/  "
                 f"({active}/{total} projects active)"
             )
         else:
@@ -514,7 +519,7 @@ def print_ls_items(items: list[dict]):
             )
             click.echo(
                 "  "
-                f"{item['id'][:8]}  {item['name']}  "
+                f"{short_id(item['id'])}  {item['name']}  "
                 f"({item['taskCount']} tasks){status}"
             )
 

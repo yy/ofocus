@@ -24,6 +24,7 @@ from ofocus.helpers import (
     print_tree,
     require_cli_result,
     run_jxa_or_exit,
+    short_id,
     strip_internal_fields,
 )
 
@@ -66,7 +67,7 @@ def _echo_first_available_tasks(project_name: str, children: list[dict]) -> None
     click.echo(f"{project_name}  — first available:")
     for task_node in children:
         line = format_task_line(task_node)
-        click.echo(f"  {task_node['id'][:8]}  {line}")
+        click.echo(f"  {short_id(task_node['id'])}  {line}")
 
 
 @project.command("ls")
