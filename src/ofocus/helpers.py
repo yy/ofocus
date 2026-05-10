@@ -213,6 +213,19 @@ def filter_tasks(
     return filtered
 
 
+def search_tasks(tasks: Sequence[Task], query: str) -> list[Task]:
+    """Return tasks whose name or note contains the query, case-insensitively."""
+    normalized_query = query.strip().lower()
+    if not normalized_query:
+        return []
+    return [
+        task
+        for task in tasks
+        if normalized_query in task.name.lower()
+        or (task.note is not None and normalized_query in task.note.lower())
+    ]
+
+
 def echo_json(value: Any) -> None:
     """Render JSON using the CLI's standard indentation."""
     click.echo(json.dumps(value, indent=2))

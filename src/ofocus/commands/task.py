@@ -20,6 +20,7 @@ from ofocus.helpers import (
     load_unique_task_list,
     open_omnifocus_item,
     run_task_lookup_or_exit,
+    search_tasks,
     set_subcommand_defaults,
     validate_task_id,
 )
@@ -255,8 +256,5 @@ def search(query, as_json):
         click.echo("Error: search query cannot be empty", err=True)
         sys.exit(1)
     task_list = load_unique_task_list(jxa.JS_TASKS, jxa.JS_INBOX)
-    q = query.lower()
-    matches = [
-        t for t in task_list if q in t.name.lower() or (t.note and q in t.note.lower())
-    ]
+    matches = search_tasks(task_list, query)
     echo_task_list(matches, "matches", as_json)

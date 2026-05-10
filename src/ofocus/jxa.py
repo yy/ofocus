@@ -17,9 +17,21 @@ function toLocalDateString(d) {
 """
 
 JS_ACTION_TASK_HELPERS = """\
-function isIndividualAction(t) {
-    var project = t.containingProject();
-    return project && t.tasks().length === 0;
+function isActiveProjectAction(
+    projectName,
+    taskId,
+    projectId,
+    projectStatus,
+    childTasks,
+    completed,
+    dropped
+) {
+    return !!projectName &&
+        taskId !== projectId &&
+        isActiveProjectStatus(projectStatus) &&
+        childTasks.length === 0 &&
+        !completed &&
+        !dropped;
 }
 """
 
@@ -244,6 +256,7 @@ JS_TASKS = (
 """
     + JS_LOCAL_DATE_HELPERS
     + JS_PROJECT_STATUS_HELPERS
+    + JS_ACTION_TASK_HELPERS
     + """\
 var doc = Application("OmniFocus").defaultDocument;
 var ids = doc.flattenedTasks.id();
@@ -260,16 +273,15 @@ var childTasks = doc.flattenedTasks.tasks();
 var tagNames = doc.flattenedTasks.tags.name();
 var tasks = [];
 for (var i = 0; i < ids.length; i++) {
-    if (
-        !projectNames[i] ||
-        ids[i] === projectIds[i] ||
-        !isActiveProjectStatus(projectStatuses[i]) ||
-        childTasks[i].length !== 0 ||
-        completed[i] ||
+    if (!isActiveProjectAction(
+        projectNames[i],
+        ids[i],
+        projectIds[i],
+        projectStatuses[i],
+        childTasks[i],
+        completed[i],
         dropped[i]
-    ) {
-        continue;
-    }
+    )) continue;
     tasks.push({
         id: ids[i],
         name: names[i],
@@ -290,6 +302,7 @@ JS_STATS = (
 """
     + JS_LOCAL_DATE_HELPERS
     + JS_PROJECT_STATUS_HELPERS
+    + JS_ACTION_TASK_HELPERS
     + """\
 var app = Application("OmniFocus");
 var doc = app.defaultDocument;
@@ -310,14 +323,15 @@ var active = 0;
 var flaggedCount = 0;
 var overdue = 0;
 for (var i = 0; i < completed.length; i++) {
-    var isAction = !!projectNames[i] && childTasks[i].length === 0;
-    if (
-        !isAction ||
-        ids[i] === projectIds[i] ||
-        !isActiveProjectStatus(projectStatuses[i]) ||
-        completed[i] ||
+    if (!isActiveProjectAction(
+        projectNames[i],
+        ids[i],
+        projectIds[i],
+        projectStatuses[i],
+        childTasks[i],
+        completed[i],
         dropped[i]
-    ) continue;
+    )) continue;
     active++;
     if (flagged[i]) flaggedCount++;
     var d = dueDates[i];

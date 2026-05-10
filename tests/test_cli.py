@@ -40,6 +40,7 @@ from ofocus.helpers import (
     print_tree,
     require_cli_result,
     run_jxa_or_exit,
+    search_tasks,
     set_subcommand_defaults,
     short_id,
     validate_date,
@@ -363,28 +364,40 @@ def test_js_tasks_uses_scalar_field_arrays_for_speed():
 
 
 def test_action_task_helper_includes_top_level_project_actions():
-    assert "t.containingProject()" in JS_ACTION_TASK_HELPERS
-    assert "t.tasks().length === 0" in JS_ACTION_TASK_HELPERS
+    assert "function isActiveProjectAction(" in JS_ACTION_TASK_HELPERS
+    assert "!!projectName" in JS_ACTION_TASK_HELPERS
+    assert "taskId !== projectId" in JS_ACTION_TASK_HELPERS
+    assert "childTasks.length === 0" in JS_ACTION_TASK_HELPERS
     assert "t.project()" not in JS_ACTION_TASK_HELPERS
     assert "t.parentTask()" not in JS_ACTION_TASK_HELPERS
 
 
 def test_js_tasks_filters_project_actions_and_excludes_task_groups():
-    assert "!projectNames[i]" in JS_TASKS
-    assert "ids[i] === projectIds[i]" in JS_TASKS
-    assert "isActiveProjectStatus(projectStatuses[i])" in JS_TASKS
-    assert "childTasks[i].length !== 0" in JS_TASKS
-    assert "completed[i]" in JS_TASKS
+    assert "function isActiveProjectAction(" in JS_TASKS
+    assert "if (!isActiveProjectAction(" in JS_TASKS
+    assert "projectNames[i]," in JS_TASKS
+    assert "ids[i]," in JS_TASKS
+    assert "projectIds[i]," in JS_TASKS
+    assert "projectStatuses[i]," in JS_TASKS
+    assert "childTasks[i]," in JS_TASKS
+    assert "completed[i]," in JS_TASKS
     assert "dropped[i]" in JS_TASKS
 
 
 def test_js_tasks_excludes_inactive_project_statuses():
     assert "doc.flattenedTasks.containingProject.status()" in JS_TASKS
-    assert "!isActiveProjectStatus(projectStatuses[i])" in JS_TASKS
+    assert "isActiveProjectStatus(projectStatus)" in JS_TASKS
     assert "function getProjectStatus(project)" in JS_PROJECT_STATUS_HELPERS
     assert 'return status === "active" || status === "active status";' in (
         JS_PROJECT_STATUS_HELPERS
     )
+
+
+def test_js_stats_reuses_active_project_action_helper():
+    assert "function isActiveProjectAction(" in JS_STATS
+    assert "if (!isActiveProjectAction(" in JS_STATS
+    assert "doc.flattenedTasks.containingProject.status()" in JS_STATS
+    assert "var isAction =" not in JS_STATS
 
 
 def test_project_scripts_reuse_shared_status_lookup_helper():
@@ -454,10 +467,13 @@ def test_stats_excludes_dropped_from_active_and_overdue(monkeypatch):
     assert "doc.flattenedTasks.containingProject.id()" in scripts[0]
     assert "doc.flattenedTasks.containingProject.status()" in scripts[0]
     assert "doc.flattenedTasks.tasks()" in scripts[0]
-    assert "childTasks[i].length === 0" in scripts[0]
-    assert "ids[i] === projectIds[i]" in scripts[0]
-    assert "!isActiveProjectStatus(projectStatuses[i])" in scripts[0]
-    assert "completed[i] ||" in scripts[0]
+    assert "if (!isActiveProjectAction(" in scripts[0]
+    assert "projectNames[i]," in scripts[0]
+    assert "ids[i]," in scripts[0]
+    assert "projectIds[i]," in scripts[0]
+    assert "projectStatuses[i]," in scripts[0]
+    assert "childTasks[i]," in scripts[0]
+    assert "completed[i]," in scripts[0]
     assert "dropped[i]" in scripts[0]
     assert "doc.flattenedTasks().filter" not in scripts[0]
 
@@ -720,6 +736,29 @@ def test_filter_tasks_keeps_empty_string_project_lookup_explicit():
     filtered = filter_tasks(tasks, project="")
 
     assert [task.id for task in filtered] == ["a1"]
+
+
+def test_search_tasks_matches_name_and_note_case_insensitively():
+    tasks = [
+        Task(id="a1", name="Read paper", note=""),
+        Task(id="a2", name="Email advisor", note="Ask about review methods"),
+        Task(id="a3", name="Plan class", note=""),
+    ]
+
+    matches = search_tasks(tasks, "REVIEW")
+
+    assert [task.id for task in matches] == ["a2"]
+
+
+def test_search_tasks_handles_missing_notes():
+    tasks = [
+        Task(id="a1", name="Read paper", note=None),
+        Task(id="a2", name="Email advisor", note=""),
+    ]
+
+    matches = search_tasks(tasks, "paper")
+
+    assert [task.id for task in matches] == ["a1"]
 
 
 def test_set_subcommand_defaults_merges_only_explicit_values():
@@ -1308,6 +1347,33 @@ def test_task_search_dedupes_inbox_and_active_results(monkeypatch):
     monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
     runner = CliRunner()
     result = runner.invoke(cli, ["task", "search", "read"])
+
+    assert result.exit_code == 0
+    assert result.output == "1 matches:\n  abc12345  Read paper [Research]\n"
+
+
+def test_task_search_strips_surrounding_whitespace(monkeypatch):
+    def fake_run_jxa(script):
+        if script == JS_TASKS:
+            return [
+                {
+                    "id": "abc12345xyz",
+                    "name": "Read paper",
+                    "flagged": False,
+                    "completed": False,
+                    "dueDate": None,
+                    "note": "Review methods",
+                    "project": "Research",
+                    "tags": [],
+                }
+            ]
+        if script == JS_INBOX:
+            return []
+        raise AssertionError(f"Unexpected script: {script}")
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["task", "search", " review "])
 
     assert result.exit_code == 0
     assert result.output == "1 matches:\n  abc12345  Read paper [Research]\n"
