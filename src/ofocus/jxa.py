@@ -484,8 +484,6 @@ JSON.stringify(result);
 JXA_TIMEOUT_SECONDS = 30
 JXA_APP_PREAMBLE = """\
 var __ofocusApp = Application("OmniFocus");
-__ofocusApp.activate();
-delay(0.2);
 """
 
 

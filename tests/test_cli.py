@@ -574,7 +574,7 @@ def test_run_jxa_empty_output_raises_omnierror(monkeypatch):
         run_jxa("JSON.stringify({ok: true});")
 
 
-def test_run_jxa_activates_omnifocus_before_script(monkeypatch):
+def test_run_jxa_does_not_activate_omnifocus(monkeypatch):
     scripts = []
 
     class Result:
@@ -591,8 +591,7 @@ def test_run_jxa_activates_omnifocus_before_script(monkeypatch):
     assert result == {"ok": True}
     assert len(scripts) == 1
     assert 'var __ofocusApp = Application("OmniFocus");' in scripts[0]
-    assert "__ofocusApp.activate();" in scripts[0]
-    assert "delay(0.2);" in scripts[0]
+    assert "activate(" not in scripts[0]
     assert scripts[0].endswith("JSON.stringify({ok: true});")
 
 
