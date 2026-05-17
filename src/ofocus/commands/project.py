@@ -12,6 +12,7 @@ from ofocus.helpers import (
     build_folder_or_project_lookup_script,
     build_fuzzy_lookup_script,
     build_item_result_stringify,
+    build_omnifocus_doc_script,
     count_tasks,
     echo_action_result,
     echo_json,
@@ -193,13 +194,13 @@ item.projects.push(proj);
         )
     else:
         project_result = build_item_result_stringify(target="proj")
-        script = f"""\
-var app = Application("OmniFocus");
-var doc = app.defaultDocument;
+        script = build_omnifocus_doc_script(
+            f"""\
 var proj = app.Project({{name: "{js_escape(name)}"}});
 doc.projects.push(proj);
 {project_result}
 """
+        )
     result = require_cli_result(run_jxa_or_exit(script), item_type="folders")
     echo_action_result(
         result,

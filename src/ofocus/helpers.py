@@ -73,6 +73,18 @@ def build_js_json_stringify(fields: Sequence[tuple[str, str]]) -> str:
     return f"JSON.stringify({{{pairs}}});"
 
 
+def build_omnifocus_doc_script(body: str, *, script_prefix: str = "") -> str:
+    """Build a JXA script with the standard OmniFocus app/document bindings."""
+    return (
+        script_prefix
+        + """\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+"""
+        + body
+    )
+
+
 def build_item_result_stringify(
     extra_fields: Sequence[tuple[str, str]] = (),
     *,
@@ -421,19 +433,16 @@ def _build_lookup_script(
     error_branch: str,
 ) -> str:
     """Build a lookup script with shared OmniFocus setup and success handling."""
-    return (
-        script_prefix
-        + lookup_helper_code
-        + f"""\
-var app = Application("OmniFocus");
-var doc = app.defaultDocument;
+    return build_omnifocus_doc_script(
+        f"""\
 {lookup_setup.rstrip()}
 {error_branch}
 else {{
     var {match_var} = lookup.match;
 {indent(success_code.rstrip(), "    ")}
 }}
-"""
+""",
+        script_prefix=script_prefix + lookup_helper_code,
     )
 
 

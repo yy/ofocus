@@ -17,6 +17,7 @@ from ofocus.helpers import (
     build_fuzzy_lookup_script,
     build_item_result_stringify,
     build_js_json_stringify,
+    build_omnifocus_doc_script,
     build_task_action_success_code,
     build_task_field_assignments,
     build_task_lookup_script,
@@ -183,6 +184,14 @@ def test_build_js_json_stringify_formats_compact_object_literal():
             [("id", "task.id()"), ("name", "task.name()"), ("completed", "true")]
         )
         == "JSON.stringify({id: task.id(), name: task.name(), completed: true});"
+    )
+
+
+def test_build_omnifocus_doc_script_wraps_body_with_standard_bindings():
+    assert build_omnifocus_doc_script("JSON.stringify({ok: true});") == (
+        'var app = Application("OmniFocus");\n'
+        "var doc = app.defaultDocument;\n"
+        "JSON.stringify({ok: true});"
     )
 
 
@@ -414,6 +423,12 @@ def test_js_projects_precomputes_task_counts_from_scalar_arrays():
     assert "taskCount: taskCounts[id] || 0" in JS_PROJECTS
     assert "project.flattenedTasks().filter" not in JS_PROJECTS
     assert "return serializeProjectSummary(p);" not in JS_PROJECTS
+
+
+def test_project_summary_task_counts_exclude_action_groups():
+    assert "t.tasks().length === 0" in JS_SERIALIZE_FOLDER_CONTENTS
+    assert "var childTasks = doc.flattenedTasks.tasks();" in JS_PROJECTS
+    assert "childTasks[i].length > 0" in JS_PROJECTS
 
 
 def test_js_due_dates_use_local_date_strings():
@@ -1088,6 +1103,9 @@ def test_inbox_add_due_uses_local_date_constructor(monkeypatch):
 
     assert result.exit_code == 0
     assert len(scripts) == 1
+    assert scripts[0].startswith(
+        'var app = Application("OmniFocus");\nvar doc = app.defaultDocument;\n'
+    )
     assert "task.dueDate = new Date(2026, 2, 15);" in scripts[0]
     assert 'new Date("2026-03-15")' not in scripts[0]
 
@@ -2302,6 +2320,26 @@ def test_project_create_empty_string_folder_uses_folder_lookup(monkeypatch):
     assert 'fuzzyMatch(doc.flattenedFolders, "")' in scripts[0]
     assert "item.projects.push(proj);" in scripts[0]
     assert 'JSON.stringify({error: "Folder not found: "});' in scripts[0]
+
+
+def test_project_create_top_level_uses_standard_omnifocus_script(monkeypatch):
+    scripts = []
+
+    def fake_run_jxa(script):
+        scripts.append(script)
+        return {"id": "p1", "name": "Test Project"}
+
+    monkeypatch.setattr(_PATCH_JXA, fake_run_jxa)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "create", "Test Project"])
+
+    assert result.exit_code == 0
+    assert len(scripts) == 1
+    assert scripts[0].startswith(
+        'var app = Application("OmniFocus");\nvar doc = app.defaultDocument;\n'
+    )
+    assert 'var proj = app.Project({name: "Test Project"});' in scripts[0]
+    assert "doc.projects.push(proj);" in scripts[0]
 
 
 # ── Availability helpers ──────────────────────────────────────────────

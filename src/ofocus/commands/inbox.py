@@ -4,6 +4,7 @@ import click
 
 from ofocus import jxa
 from ofocus.helpers import (
+    build_omnifocus_doc_script,
     build_task_field_assignments,
     build_task_result_stringify,
     echo_action_result,
@@ -48,12 +49,12 @@ def inbox_add(name, note, due, flag, as_json):
     )
     assignment_block = "\n".join(assignments)
 
-    script = f"""\
-var app = Application("OmniFocus");
-var doc = app.defaultDocument;
+    script = build_omnifocus_doc_script(
+        f"""\
 var task = app.InboxTask({{name: "{js_escape(name)}"}});
 doc.inboxTasks.push(task);
 """
+    )
     if assignment_block:
         script += assignment_block + "\n"
     script += build_task_result_stringify()
