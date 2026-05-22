@@ -171,7 +171,7 @@ JS_PROJECT_LIST_HELPERS = (
     + """\
 function countRemainingTasks(project) {
     return project.flattenedTasks().filter(function(t) {
-        return !t.completed() && !t.dropped();
+        return !t.completed() && !t.dropped() && t.tasks().length === 0;
     }).length;
 }
 
@@ -357,6 +357,7 @@ function countProjectTasksById() {
     var ids = doc.flattenedTasks.id();
     var completed = doc.flattenedTasks.completed();
     var dropped = doc.flattenedTasks.dropped();
+    var childTasks = doc.flattenedTasks.tasks();
     var projectNames = doc.flattenedTasks.containingProject.name();
     var projectIds = doc.flattenedTasks.containingProject.id();
     var counts = {};
@@ -365,7 +366,8 @@ function countProjectTasksById() {
             !projectNames[i] ||
             ids[i] === projectIds[i] ||
             completed[i] ||
-            dropped[i]
+            dropped[i] ||
+            childTasks[i].length > 0
         ) {
             continue;
         }
