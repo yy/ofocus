@@ -9,6 +9,7 @@ from click.testing import CliRunner
 
 from ofocus import __version__
 from ofocus.cli import cli
+from ofocus.commands.inbox import _build_inbox_add_script
 from ofocus.commands.project import _build_project_show_response
 from ofocus.commands.task import _build_task_update_success_code
 from ofocus.helpers import (
@@ -255,6 +256,28 @@ def test_build_task_update_success_code_with_project_moves_before_updates():
     update_index = success_code.index('    task.name = "Renamed";')
     assert move_index < update_index
     assert "project: proj ? proj.name() : null" in success_code
+
+
+def test_build_inbox_add_script_keeps_creation_assignments_and_result_together():
+    script = _build_inbox_add_script(
+        'Read "paper"',
+        note="Line 1\nLine 2",
+        due="2026-03-15",
+        flag=True,
+    )
+
+    assert script == "\n".join(
+        [
+            'var app = Application("OmniFocus");',
+            "var doc = app.defaultDocument;",
+            'var task = app.InboxTask({name: "Read \\"paper\\""});',
+            "doc.inboxTasks.push(task);",
+            "task.dueDate = new Date(2026, 2, 15);",
+            "task.flagged = true;",
+            'task.note = "Line 1\\nLine 2";',
+            "JSON.stringify({id: task.id(), name: task.name()});",
+        ]
+    )
 
 
 def test_build_task_lookup_script_uses_global_scalar_prefix_scan():
