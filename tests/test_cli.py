@@ -10,7 +10,10 @@ from click.testing import CliRunner
 from ofocus import __version__
 from ofocus.cli import cli
 from ofocus.commands.inbox import _build_inbox_add_script
-from ofocus.commands.project import _build_project_show_response
+from ofocus.commands.project import (
+    _build_project_create_script,
+    _build_project_show_response,
+)
 from ofocus.commands.task import _build_task_update_success_code
 from ofocus.helpers import (
     annotate_types,
@@ -278,6 +281,36 @@ def test_build_inbox_add_script_keeps_creation_assignments_and_result_together()
             "JSON.stringify({id: task.id(), name: task.name()});",
         ]
     )
+
+
+def test_build_project_create_script_keeps_top_level_creation_together():
+    script = _build_project_create_script('Paper "Draft"', folder=None)
+
+    expected = "\n".join(
+        [
+            'var app = Application("OmniFocus");',
+            "var doc = app.defaultDocument;",
+            'var proj = app.Project({name: "Paper \\"Draft\\""});',
+            "doc.projects.push(proj);",
+            "JSON.stringify({id: proj.id(), name: proj.name()});",
+        ]
+    )
+    assert script == expected + "\n"
+
+
+def test_build_project_create_script_wraps_folder_lookup():
+    script = _build_project_create_script('Paper "Draft"', folder="Research")
+
+    assert "function fuzzyMatch(collection, query)" in script
+    assert 'fuzzyMatch(doc.flattenedFolders, "Research")' in script
+    assert 'JSON.stringify({error: "Folder not found: Research"});' in script
+    assert "var item = lookup.match;" in script
+    assert 'var proj = app.Project({name: "Paper \\"Draft\\""});' in script
+    assert "item.projects.push(proj);" in script
+    assert (
+        "JSON.stringify({id: proj.id(), name: proj.name(), "
+        "folder: item.name()});"
+    ) in script
 
 
 def test_build_task_lookup_script_uses_global_scalar_prefix_scan():

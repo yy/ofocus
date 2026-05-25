@@ -71,6 +71,35 @@ def _echo_first_available_tasks(project_name: str, children: list[dict]) -> None
         click.echo(f"  {short_id(task_node['id'])}  {line}")
 
 
+def _build_project_create_script(name: str, folder: str | None) -> str:
+    """Build the JXA script for creating a project."""
+    if folder is not None:
+        folder_result = build_item_result_stringify(
+            [("folder", "item.name()")],
+            target="proj",
+        )
+        return build_fuzzy_lookup_script(
+            folder,
+            "doc.flattenedFolders",
+            f"""\
+var proj = app.Project({{name: "{js_escape(name)}"}});
+item.projects.push(proj);
+{folder_result}
+""",
+            item_var="item",
+            not_found_error=f"Folder not found: {folder}",
+        )
+
+    project_result = build_item_result_stringify(target="proj")
+    return build_omnifocus_doc_script(
+        f"""\
+var proj = app.Project({{name: "{js_escape(name)}"}});
+doc.projects.push(proj);
+{project_result}
+"""
+    )
+
+
 @project.command("ls")
 @click.argument("folder", default=None, required=False)
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
@@ -176,31 +205,7 @@ def open_project(project):
 @click.option("--json", "as_json", is_flag=True, help="Output JSON")
 def create(name, folder, as_json):
     """Create a new project."""
-    if folder is not None:
-        folder_result = build_item_result_stringify(
-            [("folder", "item.name()")],
-            target="proj",
-        )
-        script = build_fuzzy_lookup_script(
-            folder,
-            "doc.flattenedFolders",
-            f"""\
-var proj = app.Project({{name: "{js_escape(name)}"}});
-item.projects.push(proj);
-{folder_result}
-""",
-            item_var="item",
-            not_found_error=f"Folder not found: {folder}",
-        )
-    else:
-        project_result = build_item_result_stringify(target="proj")
-        script = build_omnifocus_doc_script(
-            f"""\
-var proj = app.Project({{name: "{js_escape(name)}"}});
-doc.projects.push(proj);
-{project_result}
-"""
-        )
+    script = _build_project_create_script(name, folder)
     result = require_cli_result(run_jxa_or_exit(script), item_type="folders")
     echo_action_result(
         result,
