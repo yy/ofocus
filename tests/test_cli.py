@@ -494,6 +494,17 @@ def test_js_due_dates_use_local_date_strings():
     assert "toISOString" not in JS_TASKS
 
 
+def test_js_inbox_uses_scalar_field_arrays_for_speed():
+    assert "var ids = doc.inboxTasks.id();" in JS_INBOX
+    assert "var names = doc.inboxTasks.name();" in JS_INBOX
+    assert "var flagged = doc.inboxTasks.flagged();" in JS_INBOX
+    assert "var completed = doc.inboxTasks.completed();" in JS_INBOX
+    assert "var dropped = doc.inboxTasks.dropped();" in JS_INBOX
+    assert "var tagNames = doc.inboxTasks.tags.name();" in JS_INBOX
+    assert "doc.inboxTasks().filter" not in JS_INBOX
+    assert "t.tags().map" not in JS_INBOX
+
+
 def test_folder_contents_script_reuses_project_summary_helpers():
     assert "function serializeFolderSummary(folder)" in JS_SERIALIZE_FOLDER_CONTENTS
     assert "function serializeProjectSummary(project)" in JS_SERIALIZE_FOLDER_CONTENTS

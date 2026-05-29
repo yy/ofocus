@@ -233,20 +233,27 @@ JS_INBOX = (
     + JS_LOCAL_DATE_HELPERS
     + """\
 var doc = Application("OmniFocus").defaultDocument;
-var tasks = doc.inboxTasks().filter(function(t) {
-    return !t.completed() && !t.dropped();
-}).map(function(t) {
-    var tags = t.tags().map(function(tg) { return tg.name(); });
-    return {
-        id: t.id(),
-        name: t.name(),
-        flagged: t.flagged(),
-        completed: t.completed(),
-        dueDate: toLocalDateString(t.dueDate()),
-        note: t.note(),
-        tags: tags
-    };
-});
+var ids = doc.inboxTasks.id();
+var names = doc.inboxTasks.name();
+var flagged = doc.inboxTasks.flagged();
+var completed = doc.inboxTasks.completed();
+var dropped = doc.inboxTasks.dropped();
+var dueDates = doc.inboxTasks.dueDate();
+var notes = doc.inboxTasks.note();
+var tagNames = doc.inboxTasks.tags.name();
+var tasks = [];
+for (var i = 0; i < ids.length; i++) {
+    if (completed[i] || dropped[i]) continue;
+    tasks.push({
+        id: ids[i],
+        name: names[i],
+        flagged: flagged[i],
+        completed: false,
+        dueDate: toLocalDateString(dueDates[i]),
+        note: notes[i],
+        tags: tagNames[i] || []
+    });
+}
 JSON.stringify(tasks);
 """
 )
