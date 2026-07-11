@@ -128,3 +128,20 @@ def test_run_osascript_json_wraps_called_process_errors(monkeypatch):
             timeout_seconds=5,
             error_prefix="Bridge",
         )
+
+
+def test_run_osascript_json_wraps_called_process_errors_without_output(monkeypatch):
+    def fake_run(*_args, **_kwargs):
+        raise subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["osascript"],
+        )
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    with pytest.raises(OmniError, match="Bridge error: $"):
+        run_osascript_json(
+            "JSON.stringify({ok: true});",
+            timeout_seconds=5,
+            error_prefix="Bridge",
+        )

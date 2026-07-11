@@ -35,6 +35,11 @@ def _parse_json_output(
     return parsed
 
 
+def _subprocess_output_text(value: str | None) -> str:
+    """Return subprocess output as text even when CalledProcessError stores None."""
+    return value or ""
+
+
 def run_osascript_json(
     script: str,
     *,
@@ -57,7 +62,9 @@ def run_osascript_json(
             f"{error_prefix} error: command timed out after {timeout_seconds} seconds"
         ) from e
     except subprocess.CalledProcessError as e:
-        detail = e.stderr.strip() or e.stdout.strip()
+        detail = _subprocess_output_text(e.stderr).strip() or _subprocess_output_text(
+            e.stdout
+        ).strip()
         raise OmniError(f"{error_prefix} error: {detail}") from e
 
     stdout = result.stdout.strip()
