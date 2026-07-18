@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from ofocus.bridge import OmniError, run_osascript_json
+from ofocus.bridge import OmniError, OmniTimeoutError, run_osascript_json
 
 
 def test_run_osascript_json_unwraps_nested_json_string(monkeypatch):
@@ -104,7 +104,7 @@ def test_run_osascript_json_wraps_timeout_errors(monkeypatch):
 
     monkeypatch.setattr("subprocess.run", fake_run)
 
-    with pytest.raises(OmniError, match="timed out after 5 seconds"):
+    with pytest.raises(OmniTimeoutError, match="timed out after 5 seconds"):
         run_osascript_json(
             "JSON.stringify({ok: true});",
             timeout_seconds=5,

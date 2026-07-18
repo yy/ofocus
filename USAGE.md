@@ -23,6 +23,7 @@ ofocus project show "Work" --all                # Include completed/dropped
 ofocus tag ls                                   # List tags
 ofocus stats                                    # Counts: inbox, active, flagged, overdue
 ofocus dump                                     # Full JSON export
+ofocus recover                                  # Restart app and verify automation
 ```
 
 ### Write

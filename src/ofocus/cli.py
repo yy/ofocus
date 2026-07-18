@@ -1,8 +1,12 @@
 """Click CLI for OmniFocus."""
 
+import subprocess
+import time
+
 import click
 
 from ofocus import __version__, jxa
+from ofocus.bridge import OmniError
 from ofocus.commands.inbox import inbox
 from ofocus.commands.project import project
 from ofocus.commands.tag import tag
@@ -22,6 +26,71 @@ cli.add_command(inbox)
 cli.add_command(task)
 cli.add_command(project)
 cli.add_command(tag)
+
+
+# ── Recover ─────────────────────────────────────────────────────────────
+
+
+_RECOVERY_WAIT_SECONDS = 10
+_RECOVERY_POLL_SECONDS = 0.25
+_RECOVERY_HEALTH_SCRIPT = """\
+var doc = Application("OmniFocus").defaultDocument;
+JSON.stringify({name: doc.name()});
+"""
+
+
+def _omnifocus_running() -> bool:
+    """Return whether the main OmniFocus process is running."""
+    result = subprocess.run(
+        ["pgrep", "-x", "OmniFocus"],
+        capture_output=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def _wait_for_omnifocus(*, running: bool) -> bool:
+    """Wait briefly for the main OmniFocus process to reach the desired state."""
+    deadline = time.monotonic() + _RECOVERY_WAIT_SECONDS
+    while _omnifocus_running() is not running:
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(_RECOVERY_POLL_SECONDS)
+    return True
+
+
+@cli.command()
+def recover():
+    """Restart OmniFocus and verify its automation bridge."""
+    subprocess.run(
+        ["pkill", "-TERM", "-x", "OmniFocus"],
+        capture_output=True,
+        check=False,
+    )
+    if not _wait_for_omnifocus(running=False):
+        raise click.ClickException("OmniFocus did not quit within 10 seconds.")
+
+    try:
+        subprocess.run(
+            ["open", "-n", "-a", "OmniFocus"],
+            capture_output=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        detail = (e.stderr or b"").decode(errors="replace").strip()
+        suffix = f": {detail}" if detail else ""
+        raise click.ClickException(f"Failed to reopen OmniFocus{suffix}") from e
+
+    if not _wait_for_omnifocus(running=True):
+        raise click.ClickException("OmniFocus did not reopen within 10 seconds.")
+
+    try:
+        jxa.run_jxa(_RECOVERY_HEALTH_SCRIPT)
+    except OmniError as e:
+        raise click.ClickException(
+            f"OmniFocus restarted, but automation is still unavailable: {e}"
+        ) from e
+    click.echo("OmniFocus automation recovered.")
 
 
 # ── Stats ────────────────────────────────────────────────────────────────

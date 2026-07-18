@@ -9,6 +9,10 @@ class OmniError(Exception):
     """Error from OmniFocus bridge execution."""
 
 
+class OmniTimeoutError(OmniError):
+    """The osascript bridge exceeded its timeout."""
+
+
 def _unwrap_json_string(value: Any) -> Any:
     """Parse a JSON string payload if it itself contains serialized JSON."""
     if not isinstance(value, str):
@@ -58,7 +62,7 @@ def run_osascript_json(
             timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired as e:
-        raise OmniError(
+        raise OmniTimeoutError(
             f"{error_prefix} error: command timed out after {timeout_seconds} seconds"
         ) from e
     except subprocess.CalledProcessError as e:

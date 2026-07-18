@@ -419,6 +419,43 @@ def test_cli_version_matches_package_version():
     assert __version__ in result.output
 
 
+def test_recover_restarts_app_and_verifies_automation(monkeypatch):
+    subprocess_calls = []
+    health_scripts = []
+
+    def fake_subprocess_run(args, **_kwargs):
+        subprocess_calls.append(args)
+        return SimpleNamespace(returncode=0, stderr=b"")
+
+    monkeypatch.setattr("ofocus.cli.subprocess.run", fake_subprocess_run)
+    monkeypatch.setattr("ofocus.cli._wait_for_omnifocus", lambda *, running: True)
+    monkeypatch.setattr(_PATCH_JXA, lambda script: health_scripts.append(script) or {})
+
+    result = CliRunner().invoke(cli, ["recover"])
+
+    assert result.exit_code == 0
+    assert result.output == "OmniFocus automation recovered.\n"
+    assert subprocess_calls == [
+        ["pkill", "-TERM", "-x", "OmniFocus"],
+        ["open", "-n", "-a", "OmniFocus"],
+    ]
+    assert len(health_scripts) == 1
+    assert 'Application("OmniFocus").defaultDocument' in health_scripts[0]
+
+
+def test_recover_stops_when_app_will_not_quit(monkeypatch):
+    monkeypatch.setattr(
+        "ofocus.cli.subprocess.run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stderr=b""),
+    )
+    monkeypatch.setattr("ofocus.cli._wait_for_omnifocus", lambda *, running: False)
+
+    result = CliRunner().invoke(cli, ["recover"])
+
+    assert result.exit_code == 1
+    assert "OmniFocus did not quit within 10 seconds" in result.output
+
+
 def test_js_tasks_uses_scalar_field_arrays_for_speed():
     assert "doc.flattenedTasks.id()" in JS_TASKS
     assert "doc.flattenedTasks.containingProject.name()" in JS_TASKS
@@ -639,8 +676,10 @@ def test_run_jxa_timeout_raises_omnierror(monkeypatch):
 
     monkeypatch.setattr("subprocess.run", fake_run)
 
-    with pytest.raises(OmniError, match="timed out"):
+    with pytest.raises(OmniError, match="ofocus recover") as exc_info:
         run_jxa("JSON.stringify({ok: true});")
+
+    assert "A write may already have been applied" in str(exc_info.value)
 
 
 def test_run_jxa_empty_output_raises_omnierror(monkeypatch):

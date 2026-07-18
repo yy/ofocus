@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from ofocus.bridge import run_osascript_json
+from ofocus.bridge import OmniTimeoutError, run_osascript_json
 
 # ── JS snippet building blocks ──────────────────────────────────────────
 
@@ -499,8 +499,14 @@ var __ofocusApp = Application("OmniFocus");
 def run_jxa(script: str) -> Any | None:
     """Run a JXA (not OmniAutomation) script and parse JSON result."""
     full_script = JXA_APP_PREAMBLE + script
-    return run_osascript_json(
-        full_script,
-        timeout_seconds=JXA_TIMEOUT_SECONDS,
-        error_prefix="JXA",
-    )
+    try:
+        return run_osascript_json(
+            full_script,
+            timeout_seconds=JXA_TIMEOUT_SECONDS,
+            error_prefix="JXA",
+        )
+    except OmniTimeoutError as e:
+        raise OmniTimeoutError(
+            f"{e}. OmniFocus automation may be stuck; run `ofocus recover` "
+            "before retrying. A write may already have been applied."
+        ) from e

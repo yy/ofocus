@@ -72,8 +72,11 @@ ofocus project create "Q2 Planning" --folder "Work"
 | `ofocus tag ls` | List all tags |
 | `ofocus stats` | Quick counts (inbox, active, flagged, overdue) |
 | `ofocus dump` | Full JSON dump of everything |
+| `ofocus recover` | Restart OmniFocus and verify automation after a timeout |
 
 Most data commands support `--json` for machine-readable output. Bare `ofocus task` and `ofocus project` default to their `ls` subcommand.
+
+If a command times out, its write may already have reached OmniFocus. Run `ofocus recover`, inspect the current state, and only then decide whether to retry the command.
 
 ## JSON mode
 
