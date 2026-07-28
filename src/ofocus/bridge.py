@@ -69,6 +69,8 @@ def run_osascript_json(
         detail = _subprocess_output_text(e.stderr).strip() or _subprocess_output_text(
             e.stdout
         ).strip()
+        if not detail:
+            detail = f"osascript exited with status {e.returncode}"
         raise OmniError(f"{error_prefix} error: {detail}") from e
 
     stdout = result.stdout.strip()

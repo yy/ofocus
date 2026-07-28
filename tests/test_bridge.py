@@ -139,7 +139,10 @@ def test_run_osascript_json_wraps_called_process_errors_without_output(monkeypat
 
     monkeypatch.setattr("subprocess.run", fake_run)
 
-    with pytest.raises(OmniError, match="Bridge error: $"):
+    with pytest.raises(
+        OmniError,
+        match="Bridge error: osascript exited with status 1",
+    ):
         run_osascript_json(
             "JSON.stringify({ok: true});",
             timeout_seconds=5,
