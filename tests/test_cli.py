@@ -623,7 +623,7 @@ def test_stats_overdue_uses_local_calendar_dates(monkeypatch):
     assert "d && d < new Date()" not in scripts[0]
 
 
-def test_stats_filters_completed_and_dropped_inbox_tasks(monkeypatch):
+def test_stats_counts_active_inbox_tasks_in_flagged_and_overdue_totals(monkeypatch):
     scripts = []
 
     def fake_run_jxa(script):
@@ -643,9 +643,18 @@ def test_stats_filters_completed_and_dropped_inbox_tasks(monkeypatch):
 
     assert result.exit_code == 0
     assert len(scripts) == 1
-    assert "doc.inboxTasks().filter(function(t) {" in scripts[0]
-    assert "return !t.completed() && !t.dropped();" in scripts[0]
-    assert "inbox: doc.inboxTasks().length" not in scripts[0]
+    assert "var inboxCompleted = doc.inboxTasks.completed();" in scripts[0]
+    assert "var inboxDropped = doc.inboxTasks.dropped();" in scripts[0]
+    assert "var inboxFlagged = doc.inboxTasks.flagged();" in scripts[0]
+    assert "var inboxDueDates = doc.inboxTasks.dueDate();" in scripts[0]
+    assert (
+        "if (inboxCompleted[inboxIndex] || inboxDropped[inboxIndex]) continue;"
+        in scripts[0]
+    )
+    assert "if (inboxFlagged[inboxIndex]) flaggedCount++;" in scripts[0]
+    assert (
+        "toLocalDateString(inboxDueDate) < today) overdue++;" in scripts[0]
+    )
 
 
 def test_stats_uses_shared_jxa_constant(monkeypatch):

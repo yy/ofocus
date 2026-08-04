@@ -322,13 +322,22 @@ var projectNames = doc.flattenedTasks.containingProject.name();
 var projectIds = doc.flattenedTasks.containingProject.id();
 var projectStatuses = doc.flattenedTasks.containingProject.status();
 var childTasks = doc.flattenedTasks.tasks();
-var inboxActive = doc.inboxTasks().filter(function(t) {
-    return !t.completed() && !t.dropped();
-}).length;
+var inboxCompleted = doc.inboxTasks.completed();
+var inboxDropped = doc.inboxTasks.dropped();
+var inboxFlagged = doc.inboxTasks.flagged();
+var inboxDueDates = doc.inboxTasks.dueDate();
 var today = toLocalDateString(new Date());
+var inboxActive = 0;
 var active = 0;
 var flaggedCount = 0;
 var overdue = 0;
+for (var inboxIndex = 0; inboxIndex < inboxCompleted.length; inboxIndex++) {
+    if (inboxCompleted[inboxIndex] || inboxDropped[inboxIndex]) continue;
+    inboxActive++;
+    if (inboxFlagged[inboxIndex]) flaggedCount++;
+    var inboxDueDate = inboxDueDates[inboxIndex];
+    if (inboxDueDate && toLocalDateString(inboxDueDate) < today) overdue++;
+}
 for (var i = 0; i < completed.length; i++) {
     if (!isActiveProjectAction(
         projectNames[i],
