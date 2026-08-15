@@ -261,6 +261,15 @@ def test_build_task_update_success_code_with_project_moves_before_updates():
     assert "project: proj ? proj.name() : null" in success_code
 
 
+def test_build_task_update_success_code_moves_to_resolved_project_id():
+    success_code = _build_task_update_success_code([], project="proj1234")
+
+    assert "var taskId = JSON.stringify(task.id());" in success_code
+    assert "var projId = JSON.stringify(projLookup.match.id());" in success_code
+    assert "const p = Project.byIdentifier(' + projId" in success_code
+    assert "flattenedProjects.find" not in success_code
+
+
 def test_build_inbox_add_script_keeps_creation_assignments_and_result_together():
     script = _build_inbox_add_script(
         'Read "paper"',
