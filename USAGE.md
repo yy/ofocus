@@ -89,7 +89,7 @@ ofocus project ls "Research"
 ofocus project show "Paper writing" --first --json
 
 # Capture a task from agent context
-ofocus inbox add "Review PR #42 - blocking release" --flag --due 2026-03-09 --json
+ofocus inbox add "Review PR #42 — blocking release" --flag --due 2026-03-09 --json
 
 # Complete a task by ID
 ofocus task complete j7cpqVlu3kR --json
