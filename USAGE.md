@@ -100,3 +100,19 @@ ofocus task search "deploy" --json
 # Snapshot for context
 ofocus dump > /tmp/omnifocus.json
 ```
+
+## Durable delegate handoff
+
+`ofocus task handoff --json` reads one JSON object from stdin with string fields
+`id`, `name`, `note`, and `token` (a UUID). The delegate must durably save the
+capture before invoking this command. It requires the full exact task ID, an
+unchanged name/note, inbox membership, and an actual tag named `agent`.
+
+On success it appends a Finch job link and completes the leaf task. It never
+deletes a task or completes a task group. A retry with the same captured values
+and token recognizes its own completed handoff. Output is `status: accepted` or
+`status: conflict` with a reason; a conflict makes no claim of success.
+
+The comparison and write are bounded JXA operations, not an atomic OmniFocus
+transaction. Detected concurrent edits stop completion; callers must hold shared
+ownership and reconcile ambiguous transport failures using the same token.

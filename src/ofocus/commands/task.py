@@ -1,6 +1,8 @@
 """Task subcommand group."""
 
+import json
 import sys
+import uuid
 from textwrap import indent
 
 import click
@@ -19,6 +21,7 @@ from ofocus.helpers import (
     load_task_list,
     load_unique_task_list,
     open_omnifocus_item,
+    run_jxa_or_exit,
     run_task_lookup_or_exit,
     search_tasks,
     set_subcommand_defaults,
@@ -132,7 +135,14 @@ def task(ctx, project_filter, tag, flagged, due_before, as_json):
     handle_group_json_option(
         ctx,
         as_json=as_json,
-        supported_subcommands=("complete", "update", "drop", "delete", "search"),
+        supported_subcommands=(
+            "complete",
+            "update",
+            "drop",
+            "delete",
+            "search",
+            "handoff",
+        ),
         unsupported_subcommands=("open",),
     )
 
@@ -169,6 +179,83 @@ def complete(task_id, as_json):
         ),
     )
     echo_action_result(result, "Completed", as_json=as_json, fallback_name=task_id)
+
+
+def build_handoff_script(payload: dict) -> str:
+    """Transfer exactly one unchanged leaf inbox task, with a retry marker."""
+    required = ("id", "name", "note", "token")
+    if any(not isinstance(payload.get(key), str) for key in required):
+        raise click.BadParameter("handoff requires string id, name, note, and token")
+    validate_task_id(payload["id"])
+    try:
+        token = str(uuid.UUID(payload["token"])).upper()
+    except ValueError as exc:
+        raise click.BadParameter("handoff token must be a UUID") from exc
+    value = {key: payload[key] for key in required}
+    value["token"] = token
+    # Two JSON encodings make the payload a JS string literal parsed as data.
+    # Captured text is never evaluated, templated into a statement, or a shell arg.
+    literal = json.dumps(json.dumps(value, ensure_ascii=True), ensure_ascii=True)
+    return "var input = JSON.parse(" + literal + ");\n" + HANDOFF_SCRIPT
+
+
+HANDOFF_SCRIPT = r"""
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+(function () {
+    var matches = doc.flattenedTasks.whose({id: input.id})();
+    function conflict(reason) {
+        return JSON.stringify({status: "conflict", reason: reason});
+    }
+    if (matches.length !== 1) return conflict("Exact task ID not found.");
+    var task = matches[0];
+    var marker = "\n\n[Finch handoff " + input.token +
+        "]\nAccepted by Finch: finch://job/" + input.token;
+    var annotated = input.note + marker;
+    function sameCapture() {
+        return task.name() === input.name && task.note() === annotated;
+    }
+    if (task.name() !== input.name ||
+        (task.note() !== input.note && task.note() !== annotated))
+        return conflict("The captured instruction or note changed.");
+    if (task.dropped()) return conflict("The task was dropped.");
+    if (task.completed()) {
+        return sameCapture()
+            ? JSON.stringify({status: "accepted", id: input.id, token: input.token})
+            : conflict("The task was completed outside this handoff.");
+    }
+    if (doc.inboxTasks.whose({id: input.id})().length !== 1 ||
+        task.tags.name().indexOf("agent") < 0)
+        return conflict("The task left the agent inbox scope.");
+    if (task.tasks().length !== 0)
+        return conflict("Task groups require individual delegation.");
+    if (task.note() === input.note) task.note = annotated;
+    if (!sameCapture() || task.tags.name().indexOf("agent") < 0 ||
+        doc.inboxTasks.whose({id: input.id})().length !== 1)
+        return conflict("The capture changed while adding the handoff link.");
+    app.markComplete(task);
+    if (!task.completed() || !sameCapture())
+        return conflict("Cannot confirm the completed handoff.");
+    return JSON.stringify({status: "accepted", id: input.id, token: input.token});
+})();
+"""
+
+
+@task.command()
+@click.option("--json", "as_json", is_flag=True, help="Output JSON")
+def handoff(as_json):
+    """Read a durable delegate's id/name/note/token from stdin, then complete it."""
+    try:
+        payload = json.load(sys.stdin)
+    except (ValueError, TypeError) as exc:
+        raise click.BadParameter("handoff requires one JSON object on stdin") from exc
+    if not isinstance(payload, dict):
+        raise click.BadParameter("handoff requires one JSON object on stdin")
+    result = run_jxa_or_exit(build_handoff_script(payload))
+    if as_json:
+        click.echo(json.dumps(result))
+    else:
+        click.echo(result.get("reason", "Accepted by Finch"))
 
 
 @task.command()
